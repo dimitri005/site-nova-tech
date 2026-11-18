@@ -1,150 +1,528 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { usePageAnimations } from '../animations/usePageAnimations'
 import logo from '../assets/nova-tech-logo.png'
-import { courses, projects, services, team } from '../data/siteContent'
+import logoLight from '../assets/nova-tech-logo-light.png'
+import { ApiError, apiDownload, apiMediaUrl, apiSend, getStoredSession, isAuthenticated, login, logout } from '../api/client'
+import { ApiState } from '../api/ApiState'
+import { useApiData } from '../api/hooks'
+import type { ActivityRecord, AdminUserRecord, ContactRecord, DashboardRecord, MediaRecord, NewsletterRecord, QuoteRecord, TrainingEnrollmentRecord, TrainingRecord, TrainingSessionRecord } from '../api/types'
 import '../styles/site-pages.css'
+import '../styles/admin-auth.css'
+import '../styles/admin-workspace.css'
 
-type RecordItem = { id: string; title: string; titleEn?: string; descriptionFr?: string; descriptionEn?: string; status: string; category?: string; client?: string; date?: string; link?: string; technologies?: string; image?: string; updatedAt?: string; [key: string]: unknown }
-const storeKey = (resource: string) => `nova-admin-${resource}`
-const initialRecords: Record<string, RecordItem[]> = {
-  services: services.map((item) => ({ id: item.slug, title: item.title.fr, titleEn: item.title.en, descriptionFr: item.description.fr, descriptionEn: item.description.en, status: 'Publié', category: item.category })),
-  projects: projects.map((item) => ({ id: item.slug, title: item.title.fr, titleEn: item.title.en, descriptionFr: item.description.fr, descriptionEn: item.description.en, client: item.client, technologies: item.technologies.join(', '), image: item.image, status: item.featured ? 'Publié' : 'Brouillon', category: item.category })),
-  courses: courses.map((item) => ({ id: item.slug, title: item.title.fr, titleEn: item.title.en, descriptionFr: item.summary.fr, descriptionEn: item.summary.en, status: 'Publié', category: 'Présentiel' })),
-  sessions: courses.flatMap((course) => course.sessions.map((session, index) => ({ id: `${course.slug}-${index}`, title: `${course.title.fr} — ${session.date.fr}`, status: session.status === 'open' ? 'Ouverte' : 'Complète', category: session.location.fr }))),
-  team: team.map((item, index) => ({ id: `member-${index + 1}`, title: item.name, titleEn: item.name, descriptionFr: item.bio.fr, descriptionEn: item.bio.en, status: 'Publié', category: item.role.fr, image: item.image })),
-  articles: [{ id: 'article-numerique', title: 'Comment faire du numérique un levier pour votre PME', status: 'Brouillon', category: 'Conseils' }],
-  testimonials: [{ id: 'testimonial-1', title: 'Témoignage client à renseigner', status: 'Brouillon', category: 'Client' }],
-  pages: [{ id: 'about', title: 'À propos', titleEn: 'About', status: 'Publié', category: 'Page statique' }, { id: 'legal', title: 'Mentions légales', titleEn: 'Legal notice', status: 'Brouillon', category: 'Page légale' }, { id: 'privacy', title: 'Politique de confidentialité', titleEn: 'Privacy policy', status: 'Brouillon', category: 'Page légale' }],
+type Field = { name: string; label: string; type?: 'text' | 'textarea' | 'number' | 'date' | 'datetime-local' | 'url' | 'email' | 'checkbox' | 'select' | 'list'; required?: boolean; options?: { value: string; label: string }[] }
+type Row = Record<string, unknown> & { id?: string; slug?: string }
+type Resource = { key: string; label: string; path: string; fields: Field[]; keyField?: 'id' | 'slug'; superAdminDelete?: boolean }
+
+const resources: Resource[] = [
+  { key: 'services', label: 'Services', path: '/admin/services', fields: [
+    { name: 'slug', label: 'Slug', required: true }, { name: 'category', label: 'Catégorie', required: true },
+    { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
+    { name: 'descriptionFr', label: 'Description (FR)', type: 'textarea', required: true }, { name: 'descriptionEn', label: 'Description (EN)', type: 'textarea', required: true },
+    { name: 'imageUrl', label: 'URL de l’image', type: 'url' }, { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+  { key: 'projects', label: 'Réalisations', path: '/admin/projects', fields: [
+    { name: 'slug', label: 'Slug', required: true }, { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
+    { name: 'descriptionFr', label: 'Description (FR)', type: 'textarea', required: true }, { name: 'descriptionEn', label: 'Description (EN)', type: 'textarea', required: true },
+    { name: 'category', label: 'Catégorie', required: true }, { name: 'clientName', label: 'Client' },
+    { name: 'technologies', label: 'Technologies (une par ligne)', type: 'list' }, { name: 'galleryUrls', label: 'Galerie d’images (une URL par ligne)', type: 'list' },
+    { name: 'coverImageUrl', label: 'Image principale', type: 'url' }, { name: 'projectDate', label: 'Date du projet', type: 'date' }, { name: 'projectUrl', label: 'Lien du projet', type: 'url' },
+    { name: 'featured', label: 'Mettre en avant', type: 'checkbox' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+  { key: 'trainings', label: 'Formations', path: '/admin/trainings', superAdminDelete: true, fields: [
+    { name: 'slug', label: 'Slug', required: true }, { name: 'titleFr', label: 'Intitulé (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
+    { name: 'descriptionFr', label: 'Description (FR)', type: 'textarea', required: true }, { name: 'descriptionEn', label: 'Description (EN)', type: 'textarea', required: true },
+    { name: 'objectivesFr', label: 'Objectifs (FR)', type: 'textarea' }, { name: 'objectivesEn', label: 'Objectives (EN)', type: 'textarea' },
+    { name: 'audienceFr', label: 'Public cible (FR)', type: 'textarea' }, { name: 'audienceEn', label: 'Target audience (EN)', type: 'textarea' },
+    { name: 'prerequisitesFr', label: 'Prérequis (FR)', type: 'textarea' }, { name: 'prerequisitesEn', label: 'Prerequisites (EN)', type: 'textarea' },
+    { name: 'programFr', label: 'Programme (FR)', type: 'textarea' }, { name: 'programEn', label: 'Program (EN)', type: 'textarea' },
+    { name: 'durationHours', label: 'Durée (heures)', type: 'number' }, { name: 'indicativePrice', label: 'Tarif indicatif', type: 'number' },
+    { name: 'currency', label: 'Devise' }, { name: 'imageUrl', label: 'Image', type: 'url' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+  { key: 'team', label: 'Équipe', path: '/admin/team', fields: [
+    { name: 'slug', label: 'Slug', required: true }, { name: 'fullName', label: 'Nom complet', required: true },
+    { name: 'positionFr', label: 'Poste (FR)', required: true }, { name: 'positionEn', label: 'Position (EN)', required: true },
+    { name: 'biographyFr', label: 'Biographie (FR)', type: 'textarea', required: true }, { name: 'biographyEn', label: 'Biography (EN)', type: 'textarea', required: true },
+    { name: 'photoUrl', label: 'Photo', type: 'url' }, { name: 'email', label: 'E-mail', type: 'email' },
+    { name: 'linkedInUrl', label: 'LinkedIn', type: 'url' }, { name: 'facebookUrl', label: 'Facebook', type: 'url' },
+    { name: 'category', label: 'Catégorie', type: 'select', required: true, options: [{ value: 'FOUNDER', label: 'Fondateur' }, { value: 'STAFF', label: 'Personnel' }] },
+    { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+  { key: 'testimonials', label: 'Témoignages', path: '/admin/testimonials', fields: [
+    { name: 'authorName', label: 'Nom de l’auteur', required: true }, { name: 'authorRoleFr', label: 'Fonction (FR)' }, { name: 'authorRoleEn', label: 'Role (EN)' },
+    { name: 'organizationName', label: 'Organisation' }, { name: 'quoteFr', label: 'Témoignage (FR)', type: 'textarea', required: true },
+    { name: 'quoteEn', label: 'Testimonial (EN)', type: 'textarea', required: true }, { name: 'rating', label: 'Note (1 à 5)', type: 'number', required: true },
+    { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+  { key: 'partners', label: 'Partenaires', path: '/admin/partners', fields: [
+    { name: 'name', label: 'Nom', required: true }, { name: 'logoUrl', label: 'Logo', type: 'url', required: true },
+    { name: 'websiteUrl', label: 'Site web', type: 'url' }, { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+  { key: 'articles', label: 'Articles', path: '/admin/articles', fields: [
+    { name: 'slug', label: 'Slug', required: true }, { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
+    { name: 'excerptFr', label: 'Résumé (FR)', type: 'textarea', required: true }, { name: 'excerptEn', label: 'Excerpt (EN)', type: 'textarea', required: true },
+    { name: 'bodyFr', label: 'Contenu HTML (FR)', type: 'textarea', required: true }, { name: 'bodyEn', label: 'HTML content (EN)', type: 'textarea', required: true },
+    { name: 'category', label: 'Catégorie', required: true }, { name: 'coverImageUrl', label: 'Image de couverture', type: 'url' },
+    { name: 'seoTitleFr', label: 'Titre SEO (FR)' }, { name: 'seoTitleEn', label: 'SEO title (EN)' },
+    { name: 'seoDescriptionFr', label: 'Description SEO (FR)', type: 'textarea' }, { name: 'seoDescriptionEn', label: 'SEO description (EN)', type: 'textarea' },
+    { name: 'status', label: 'Publication', type: 'select', required: true, options: [{ value: 'DRAFT', label: 'Brouillon' }, { value: 'PUBLISHED', label: 'Publié' }] },
+  ] },
+  { key: 'pages', label: 'Pages statiques', path: '/admin/site-content/pages', keyField: 'slug', fields: [
+    { name: 'slug', label: 'Slug (ex. about, legal, privacy)', required: true }, { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
+    { name: 'bodyFr', label: 'Contenu HTML (FR)', type: 'textarea', required: true }, { name: 'bodyEn', label: 'HTML content (EN)', type: 'textarea', required: true }, { name: 'published', label: 'Publié', type: 'checkbox' },
+  ] },
+]
+
+const requestLinks = [
+  { key: 'messages', label: 'Messages' }, { key: 'quotes', label: 'Demandes de devis' }, { key: 'enrollments', label: 'Pré-inscriptions' },
+]
+
+function useAuthChange() {
+  const [, setRevision] = useState(0)
+  useEffect(() => {
+    const update = () => setRevision((value) => value + 1)
+    window.addEventListener('nova:auth-changed', update)
+    window.addEventListener('nova:auth-expired', update)
+    return () => { window.removeEventListener('nova:auth-changed', update); window.removeEventListener('nova:auth-expired', update) }
+  }, [])
 }
-const resources = [
-  { key: 'services', label: 'Services' }, { key: 'projects', label: 'Réalisations' }, { key: 'courses', label: 'Formations' }, { key: 'sessions', label: 'Sessions' }, { key: 'team', label: 'Équipe' }, { key: 'testimonials', label: 'Témoignages' }, { key: 'articles', label: 'Articles' }, { key: 'pages', label: 'Pages statiques' },
-]
-const leadResources = [
-  { key: 'messages', label: 'Messages', storage: 'nova-demo-messages' }, { key: 'quotes', label: 'Demandes de devis', storage: 'nova-demo-quotes' }, { key: 'registrations', label: 'Pré-inscriptions', storage: 'nova-demo-registrations' },
-]
 
-function readRecords(resource: string): RecordItem[] {
-  const stored = localStorage.getItem(storeKey(resource))
-  if (stored) { try { return JSON.parse(stored) as RecordItem[] } catch { return [] } }
-  return initialRecords[resource] ?? []
+function ErrorMessage({ value }: { value: string }) {
+  return value ? <p className="form-error" role="alert">{value}</p> : null
 }
 
 function AdminLogin() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [error, setError] = useState('')
-  const { t } = useTranslation()
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const [busy, setBusy] = useState(false)
+  const [forgot, setForgot] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setError('')
     const data = new FormData(event.currentTarget)
-    if (!String(data.get('email')).includes('@') || String(data.get('password')).length < 6) { setError('Saisissez un e-mail valide et au moins 6 caractères.'); return }
-    localStorage.setItem('nova-admin-demo-session', 'active')
-    navigate('/admin')
+    try {
+      await login(String(data.get('email')), String(data.get('password')))
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+      navigate(from && from.startsWith('/admin') ? from : '/admin', { replace: true })
+    } catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Connexion impossible. Vérifiez que le serveur est lancé.') }
+    finally { setBusy(false) }
   }
-  if (localStorage.getItem('nova-admin-demo-session') === 'active') return <Navigate to="/admin" replace/>
-  return <main className="admin-login-page"><Link to="/fr" className="admin-login-brand"><img src={logo} alt="NOVA-TECH-SOLUTION"/></Link><div className="admin-login-card"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h1>{t('admin.login')}</h1><p>{t('admin.subtitle')}</p><form className="public-form" onSubmit={submit}><label>{t('admin.email')}<input name="email" type="email" autoComplete="username" required/></label><label>{t('admin.password')}<input name="password" type="password" autoComplete="current-password" minLength={6} required/></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-action" type="submit">{t('admin.signIn')} <span>→</span></button></form><div className="demo-access"><b>{t('admin.demoAccess')}</b><span>admin@nova-tech.local</span><span>frontend-demo</span></div><p className="demo-caption">{t('admin.localNotice')}</p><Link className="back-link" to="/fr">← {t('common.back')}</Link></div></main>
+  const requestReset = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setError(''); setNotice('')
+    const email = String(new FormData(event.currentTarget).get('email'))
+    try { await apiSend('/auth/password/forgot', 'POST', { email }); setNotice('Si ce compte existe, un lien de réinitialisation a été envoyé.') }
+    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Impossible de contacter le serveur.') }
+    finally { setBusy(false) }
+  }
+  if (isAuthenticated()) return <Navigate to="/admin" replace/>
+  return <main className="admin-login-page">
+    <div className="admin-login-shell">
+      <section className="admin-login-welcome" aria-label="Bienvenue">
+        <img className="admin-login-logo-light" src={logoLight} alt="NovaTech Solution — On code votre réussite"/>
+        <div className="admin-login-welcome-copy">
+          <p className="admin-login-kicker">ESPACE D’ADMINISTRATION</p>
+          <h2>Bienvenue dans votre <span>espace&nbsp;!</span></h2>
+          <p>Connectez-vous pour gérer vos contenus, suivre vos demandes et faire grandir votre présence en ligne.</p>
+        </div>
+        <div className="admin-login-art" aria-hidden="true">
+          <div className="admin-login-chart-card"><div className="admin-login-art-label"><i/> VOTRE ACTIVITÉ</div><div className="admin-login-bars"><i/><i/><i/><i/><i/><i/><i/></div><div className="admin-login-chart-line"><i/><i/><i/><i/><i/></div></div>
+          <div className="admin-login-float-card"><span>✓</span><div><strong>Tout est prêt</strong><small>Votre espace sécurisé</small></div></div>
+          <span className="admin-login-orbit admin-login-orbit-one"/><span className="admin-login-orbit admin-login-orbit-two"/>
+        </div>
+        <p className="admin-login-tagline">Des outils simples pour piloter votre réussite.</p>
+      </section>
+      <section className="admin-login-panel">
+        <div className="admin-login-content">
+          <img className="admin-login-logo" src={logo} alt="NovaTech Solution — On code votre réussite"/>
+          <div className="admin-login-emblem" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10M6.5 10h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 14v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg></div>
+          <div className="admin-login-title"><p className="admin-login-kicker">ACCÈS SÉCURISÉ</p><h1>{forgot ? 'Mot de passe oublié ?' : 'Connexion'}</h1><p>{forgot ? 'Recevez un lien sécurisé pour choisir un nouveau mot de passe.' : 'Entrez vos identifiants pour accéder à votre espace.'}</p></div>
+          {forgot ? <form className="admin-auth-form" onSubmit={requestReset}>
+            <label htmlFor="admin-reset-email">Adresse e-mail</label>
+            <div className="admin-auth-input"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg><input id="admin-reset-email" name="email" type="email" autoComplete="email" placeholder="nom@exemple.com" required/></div>
+            <ErrorMessage value={error}/>{notice && <p className="admin-auth-success" role="status">{notice}</p>}
+            <button className="admin-auth-submit" type="submit" disabled={busy}>{busy ? 'Envoi en cours…' : 'Envoyer le lien'}<span aria-hidden="true">→</span></button>
+            <button type="button" className="admin-auth-back" onClick={() => { setForgot(false); setError(''); setNotice('') }}>Retour à la connexion</button>
+          </form> : <form className="admin-auth-form" onSubmit={submit}>
+            <label htmlFor="admin-login-email">Adresse e-mail</label>
+            <div className="admin-auth-input"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg><input id="admin-login-email" name="email" type="email" autoComplete="username" placeholder="nom@exemple.com" required/></div>
+            <div className="admin-auth-password-label"><label htmlFor="admin-login-password">Mot de passe</label><button type="button" onClick={() => setForgot(true)}>Mot de passe oublié ?</button></div>
+            <div className="admin-auth-input"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="M8 10V7a4 4 0 1 1 8 0v3m-4 5v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg><input id="admin-login-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Votre mot de passe" required/><button className="admin-auth-reveal" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}>{showPassword ? 'Masquer' : 'Afficher'}</button></div>
+            <ErrorMessage value={error}/>
+            <button className="admin-auth-submit" type="submit" disabled={busy}>{busy ? 'Connexion en cours…' : 'Se connecter'}<span aria-hidden="true">→</span></button>
+            <p className="admin-auth-account-note">La création des comptes est réservée au super administrateur.</p>
+          </form>}
+          <div className="admin-login-footer"><span className="admin-login-shield" aria-hidden="true">✓</span><span>Connexion sécurisée · Données protégées</span></div>
+          <Link className="admin-login-back-site" to="/fr">← Retour au site</Link>
+        </div>
+      </section>
+    </div>
+  </main>
+}
+
+function ResetPassword() {
+  const navigate = useNavigate()
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const token = new URLSearchParams(window.location.search).get('token') || ''
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setError('')
+    const password = String(new FormData(event.currentTarget).get('password'))
+    try { await apiSend('/auth/password/reset', 'POST', { token, newPassword: password }); setDone(true); window.setTimeout(() => navigate('/admin/login'), 1800) }
+    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Réinitialisation impossible.') }
+    finally { setBusy(false) }
+  }
+  return <main className="admin-login-page"><div className="admin-login-card"><h1>Nouveau mot de passe</h1>{done ? <p className="form-success" role="status">Mot de passe modifié. Redirection vers la connexion…</p> : <form className="public-form" onSubmit={submit}><label>Nouveau mot de passe<input type="password" name="password" minLength={12} required autoComplete="new-password"/></label><p>12 caractères minimum avec une minuscule, une majuscule et un chiffre.</p><ErrorMessage value={error}/><button className="primary-action" disabled={!token || busy}>{busy ? 'Mise à jour…' : 'Changer le mot de passe'}</button></form>}</div></main>
 }
 
 function AdminLayout() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
+  useAuthChange()
   const location = useLocation()
+  const navigate = useNavigate()
+  const pageScope = useRef<HTMLDivElement>(null)
   const [collapsed, setCollapsed] = useState(false)
-  if (localStorage.getItem('nova-admin-demo-session') !== 'active') return <Navigate to="/admin/login" state={{ from: location }} replace/>
-  const logout = () => { localStorage.removeItem('nova-admin-demo-session'); navigate('/admin/login') }
-  return <div className={`admin-shell${collapsed ? ' sidebar-collapsed' : ''}`}><aside className="admin-sidebar"><Link to="/admin" className="admin-logo"><img src={logo} alt="NOVA-TECH-SOLUTION"/></Link><p className="admin-nav-label">WORKSPACE</p><NavLink end to="/admin" className="admin-nav-link"><span>▦</span>{t('admin.dashboard')}</NavLink><p className="admin-nav-label">CONTENU DU SITE</p>{resources.map((item) => <NavLink key={item.key} to={`/admin/content/${item.key}`} className="admin-nav-link"><span>◈</span>{item.label}</NavLink>)}<NavLink to="/admin/media" className="admin-nav-link"><span>▧</span>Médiathèque</NavLink><p className="admin-nav-label">DEMANDES</p>{leadResources.map((item) => <NavLink key={item.key} to={`/admin/requests/${item.key}`} className="admin-nav-link"><span>◉</span>{item.label}</NavLink>)}<NavLink to="/admin/settings" className="admin-nav-link"><span>⚙</span>{t('admin.settings')}</NavLink><button className="admin-logout" onClick={logout}><span>↪</span>{t('admin.logout')}</button></aside><div className="admin-main"><header className="admin-topbar"><button className="sidebar-toggle" onClick={() => setCollapsed((value) => !value)} aria-label="Toggle sidebar">☰</button><div><span className="admin-demo-pill">FRONTEND DEMO</span><span className="admin-user"><i>NT</i> Administrateur</span></div></header><div className="admin-content"><Outlet/></div></div></div>
+  usePageAnimations(pageScope, location.pathname)
+  if (!isAuthenticated()) return <Navigate to="/admin/login" state={{ from: location }} replace/>
+  const session = getStoredSession()
+  const superAdmin = session?.roles.includes('SUPER_ADMIN') ?? false
+  const doLogout = async () => { await logout(); navigate('/admin/login', { replace: true }) }
+  return <div className={`admin-shell${collapsed ? ' sidebar-collapsed' : ''}`} ref={pageScope}><aside className="admin-sidebar"><Link to="/admin" className="admin-logo"><img src={logo} alt="NOVA-TECH-SOLUTION"/></Link><p className="admin-nav-label">ESPACE ADMIN</p><NavLink end to="/admin" className="admin-nav-link">Tableau de bord</NavLink><p className="admin-nav-label">CONTENUS</p>{resources.map((item) => <NavLink key={item.key} to={`/admin/content/${item.key}`} className="admin-nav-link">{item.label}</NavLink>)}<NavLink to="/admin/sessions" className="admin-nav-link">Sessions</NavLink><NavLink to="/admin/media" className="admin-nav-link">Médiathèque</NavLink><p className="admin-nav-label">DEMANDES</p>{requestLinks.map((item) => <NavLink key={item.key} to={`/admin/requests/${item.key}`} className="admin-nav-link">{item.label}</NavLink>)}<NavLink to="/admin/newsletter" className="admin-nav-link">Newsletter</NavLink><NavLink to="/admin/settings" className="admin-nav-link">Paramètres</NavLink>{superAdmin && <NavLink to="/admin/activity" className="admin-nav-link">Journal d&#39;activit&#233;</NavLink>}{superAdmin && <NavLink to="/admin/users" className="admin-nav-link">Utilisateurs</NavLink>}<button className="admin-logout" onClick={() => void doLogout()}>Déconnexion</button></aside><div className="admin-main"><header className="admin-topbar"><button className="sidebar-toggle" onClick={() => setCollapsed((value) => !value)} aria-label="Réduire le menu">☰</button><div><span className="admin-user"><i>{session?.displayName?.slice(0, 2).toUpperCase() || 'NT'}</i>{session?.displayName || session?.email}</span></div></header><div className="admin-content"><Outlet/></div></div></div>
+}
+
+function DashboardIcon({ name }: { name: string }) {
+  const paths: Record<string, string> = {
+    messages: 'M4 5h16v11H8l-4 3V5Zm4 4h8m-8 3h5',
+    quotes: 'M12 3v18m4-14H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7',
+    enrollments: 'M5 4v3m14-3v3M4 8h16v12H4V8Zm4 4h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01',
+    projects: 'M4 7h16v13H4V7Zm4 0V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-8 5h8m-4-2v4',
+    articles: 'M6 3h9l4 4v14H6V3Zm9 0v5h4m-9 4h5m-5 4h8m-8 3h8',
+    add: 'M12 5v14m-7-7h14',
+    training: 'M3 8.5 12 4l9 4.5-9 4.5-9-4.5Zm3 2v5c3.5 3 8.5 3 12 0v-5m3-2v7',
+    media: 'M4 5h16v14H4V5Zm2 11 4-4 3 3 2-2 3 3M9 9h.01',
+  }
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d={paths[name] || paths.articles} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
 }
 
 function AdminDashboard() {
-  const { t } = useTranslation()
-  const allLeads = leadResources.flatMap((item) => { try { return JSON.parse(localStorage.getItem(item.storage) || '[]') as object[] } catch { return [] } })
+  const { data, loading, error, reload } = useApiData<DashboardRecord>('/admin/dashboard')
   const stats = [
-    { label: 'Contenus publiés', value: Object.values(initialRecords).flat().filter((item) => item.status === 'Publié').length, icon: '◈' },
-    { label: 'Messages & demandes', value: allLeads.length, icon: '✉' },
-    { label: 'Formations', value: courses.length, icon: '▤' },
-    { label: 'Projets', value: projects.length, icon: '⌘' },
+    { label: 'Messages non lus', value: data?.unreadMessages, key: 'messages', note: 'À traiter' },
+    { label: 'Devis en attente', value: data?.pendingQuotes, key: 'quotes', note: 'Demandes clients' },
+    { label: 'Pré-inscriptions', value: data?.recentEnrollments, key: 'enrollments', note: 'Formations' },
+    { label: 'Projets publiés', value: data?.publishedProjects, key: 'projects', note: 'Dans le portfolio' },
+    { label: 'Articles publiés', value: data?.publishedArticles, key: 'articles', note: 'Actualités du site' },
   ]
-  return <><div className="admin-page-heading"><div><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h1>{t('admin.welcome')}</h1><p>{t('admin.subtitle')}</p></div><Link className="primary-action inline-action" to="/admin/content/projects">Gérer les contenus <span>→</span></Link></div><div className="admin-stat-grid">{stats.map((item) => <article className="admin-stat-card" key={item.label}><span>{item.icon}</span><small>{item.label}</small><strong>{item.value}</strong><i>{item.label === 'Messages & demandes' ? 'Enregistrés dans ce navigateur' : 'Données de démonstration'}</i></article>)}</div><section className="admin-panel"><div className="admin-panel-heading"><div><h2>{t('admin.recent')}</h2><p>Dernières demandes conservées en local</p></div><Link to="/admin/requests/messages">Voir les demandes →</Link></div>{allLeads.length ? <div className="admin-table-wrap"><table><thead><tr><th>Type</th><th>Demandeur</th><th>E-mail</th><th>Statut</th></tr></thead><tbody>{allLeads.slice(0, 5).map((item, index) => { const lead = item as Record<string, string>; return <tr key={`${lead.email}-${index}`}><td>{lead.service || lead.subject || lead.course || 'Message'}</td><td>{lead.name}</td><td>{lead.email}</td><td><span className="status-tag">Nouveau</span></td></tr> })}</tbody></table></div> : <div className="admin-empty"><span>✉</span><p>{t('admin.noData')}</p><small>Les demandes de la partie publique apparaîtront ici dans cette démonstration.</small></div>}</section><div className="admin-notice">{t('admin.localNotice')}</div></>
+  const quickActions = [
+    { to: '/admin/content/projects', icon: 'add', title: 'Ajouter une réalisation', description: 'Présentez un nouveau projet' },
+    { to: '/admin/content/trainings', icon: 'training', title: 'Gérer les formations', description: 'Cours et sessions' },
+    { to: '/admin/requests/messages', icon: 'messages', title: 'Consulter les messages', description: 'Échangez avec vos visiteurs' },
+    { to: '/admin/media', icon: 'media', title: 'Ajouter un média', description: 'Enrichissez votre médiathèque' },
+  ]
+  return <>
+    <div className="admin-page-heading admin-dashboard-heading">
+      <div><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h1>Tableau de bord</h1><p>Retrouvez ici les indicateurs clés de votre activité.</p></div>
+      <Link className="admin-dashboard-cta" to="/admin/content/projects"><span>Gérer les contenus</span><span aria-hidden="true">→</span></Link>
+    </div>
+    <ApiState loading={loading} error={error} onRetry={reload}/>
+    <section className="admin-dashboard-section" aria-label="Indicateurs d’activité">
+      <div className="admin-section-heading"><div><h2>Vue d’ensemble</h2><p>Les données sont actualisées depuis le serveur.</p></div><span className="admin-live-label"><i/> En direct</span></div>
+      <div className="admin-stat-grid">{stats.map((stat) => <article className="admin-stat-card" key={stat.key}><span className={`admin-stat-icon admin-stat-icon-${stat.key}`}><DashboardIcon name={stat.key}/></span><div className="admin-stat-copy"><small>{stat.label}</small><strong>{stat.value ?? '—'}</strong><i>{stat.note}</i></div></article>)}</div>
+    </section>
+    <section className="admin-dashboard-section admin-quick-panel">
+      <div className="admin-section-heading"><div><h2>Raccourcis</h2><p>Accédez directement aux tâches les plus courantes.</p></div></div>
+      <div className="quick-actions">{quickActions.map((action) => <Link className="quick-action-card" to={action.to} key={action.to}><span className="quick-action-icon"><DashboardIcon name={action.icon}/></span><span className="quick-action-copy"><strong>{action.title}</strong><small>{action.description}</small></span><span className="quick-action-arrow" aria-hidden="true">↗</span></Link>)}</div>
+    </section>
+  </>
+}
+function fieldValue(field: Field, value: unknown): string {
+  if (field.type === 'checkbox') return value ? 'true' : ''
+  if (field.type === 'list') return Array.isArray(value) ? value.join('\n') : String(value ?? '')
+  if (field.type === 'datetime-local' && value) return new Date(String(value)).toISOString().slice(0, 16)
+  return value == null ? '' : String(value)
+}
+
+function fieldsToBody(form: HTMLFormElement, fields: Field[]): Row {
+  const body: Row = {}
+  const data = new FormData(form)
+  for (const field of fields) {
+    const value = field.type === 'checkbox' ? data.get(field.name) === 'on' : data.get(field.name)
+    if (field.type === 'list') body[field.name] = String(value || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    else if (field.type === 'number') body[field.name] = value === '' || value == null ? null : Number(value)
+    else if (field.type === 'datetime-local') body[field.name] = value ? new Date(String(value)).toISOString() : null
+    else body[field.name] = value === '' ? null : value
+  }
+  return body
+}
+
+function EditorForm({ fields, initial, title, onCancel, onSave }: { fields: Field[]; initial?: Row | null; title: string; onCancel: () => void; onSave: (body: Row) => Promise<void> }) {
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError(''); setBusy(true)
+    try { await onSave(fieldsToBody(event.currentTarget, fields)) }
+    catch (reason) { setError(reason instanceof ApiError ? `${reason.message}${Object.values(reason.fields).length ? ` — ${Object.values(reason.fields).join(' ')}` : ''}` : 'Enregistrement impossible.') }
+    finally { setBusy(false) }
+  }
+  return <form className="admin-edit-form" onSubmit={submit}><h2>{title}</h2><div className="form-two-columns">{fields.map((field) => <label key={field.name} className={field.type === 'checkbox' ? 'admin-checkbox-field' : ''}>{field.type === 'checkbox' ? <><input type="checkbox" name={field.name} defaultChecked={Boolean(initial?.[field.name])}/>{field.label}</> : <>{field.label}{field.type === 'textarea' || field.type === 'list' ? <textarea name={field.name} rows={field.type === 'list' ? 3 : 4} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}/> : field.type === 'select' ? <select name={field.name} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}><option value="">Choisir…</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input name={field.name} type={field.type || 'text'} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} step={field.type === 'number' ? 'any' : undefined}/>}</>}</label>)}</div><ErrorMessage value={error}/><div className="edit-form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Annuler</button><button className="primary-action" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button></div></form>
 }
 
 function ContentManager() {
   const { resource = 'services' } = useParams()
-  const { t } = useTranslation()
-  const [items, setItems] = useState<RecordItem[]>(() => readRecords(resource))
-  const [search, setSearch] = useState('')
-  const [editing, setEditing] = useState<RecordItem | null>(null)
-  const [adding, setAdding] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const label = resources.find((item) => item.key === resource)?.label ?? resource
-  useEffect(() => { setItems(readRecords(resource)); setSearch(''); setEditing(null); setAdding(false) }, [resource])
-  const filtered = useMemo(() => items.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [items, search])
-  const save = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const data = new FormData(event.currentTarget)
-    const record: RecordItem = { id: editing?.id ?? crypto.randomUUID(), title: String(data.get('title')), titleEn: String(data.get('titleEn') || ''), descriptionFr: String(data.get('descriptionFr') || ''), descriptionEn: String(data.get('descriptionEn') || ''), status: String(data.get('status')), category: String(data.get('category') || ''), client: String(data.get('client') || ''), date: String(data.get('date') || ''), link: String(data.get('link') || ''), technologies: String(data.get('technologies') || ''), image: String(data.get('image') || ''), updatedAt: new Date().toISOString() }
-    const next = editing ? items.map((item) => item.id === editing.id ? record : item) : [record, ...items]
-    setItems(next); localStorage.setItem(storeKey(resource), JSON.stringify(next)); setEditing(null); setAdding(false); setSaved(true); window.setTimeout(() => setSaved(false), 2500)
+  const definition = resources.find((item) => item.key === resource)
+  if (!definition) return <p className="api-state">Type de contenu inconnu.</p>
+  return <ResourceManager definition={definition}/>
+}
+
+function ResourceManager({ definition }: { definition: Resource }) {
+  const { data, loading, error, reload } = useApiData<Row[]>(definition.path)
+  const [editing, setEditing] = useState<Row | null | false>(false)
+  const [notice, setNotice] = useState('')
+  const records = data || []
+  const columns = definition.fields.filter((field) => ['titleFr', 'fullName', 'authorName', 'name', 'slug', 'category', 'status', 'published', 'featured'].includes(field.name)).slice(0, 4)
+  const save = async (body: Row) => {
+    const keyName = definition.keyField || 'id'
+    const id = editing ? editing[keyName] : null
+    if (definition.key === 'pages') await apiSend(definition.path, 'PUT', body)
+    else if (id) await apiSend(`${definition.path}/${encodeURIComponent(String(id))}`, 'PUT', body)
+    else await apiSend(definition.path, 'POST', body)
+    setEditing(false); setNotice('Enregistré.'); reload()
   }
-  const remove = (id: string) => { if (!window.confirm('Supprimer cet élément de la démonstration locale ?')) return; const next = items.filter((item) => item.id !== id); setItems(next); localStorage.setItem(storeKey(resource), JSON.stringify(next)) }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">CONTENU DU SITE <i/></p><h1>{label}</h1><p>Gestion de démonstration — données locales au navigateur.</p></div><button className="primary-action" onClick={() => { setAdding(true); setEditing(null) }}>{t('admin.create')} <span>＋</span></button></div>{saved && <p className="admin-toast" role="status">Modifications enregistrées localement.</p>}{(adding || editing) && <form className="admin-edit-form" onSubmit={save}><h2>{editing ? t('admin.edit') : t('admin.create')} · {label}</h2><div className="form-two-columns"><label>Titre (FR)<input name="title" defaultValue={editing?.title ?? ''} required autoFocus/></label><label>Title (EN)<input name="titleEn" defaultValue={editing?.titleEn ?? ''}/></label></div><div className="form-two-columns"><label>Description (FR)<textarea name="descriptionFr" rows={3} defaultValue={editing?.descriptionFr ?? ''}/></label><label>Description (EN)<textarea name="descriptionEn" rows={3} defaultValue={editing?.descriptionEn ?? ''}/></label></div><div className="form-two-columns"><label>{t('admin.status')}<select name="status" defaultValue={editing?.status ?? 'Brouillon'}><option>Publié</option><option>Brouillon</option><option>En cours</option><option>Ouverte</option><option>Complète</option></select></label><label>{t('common.category')}<input name="category" defaultValue={editing?.category ?? ''}/></label></div><div className="form-two-columns"><label>Client / lieu<input name="client" defaultValue={editing?.client ?? ''}/></label><label>Date de publication / session<input name="date" type="date" defaultValue={editing?.date ?? ''}/></label></div><div className="form-two-columns"><label>Technologies / programme<input name="technologies" defaultValue={editing?.technologies ?? ''}/></label><label>URL de l’image<input name="image" type="url" defaultValue={editing?.image ?? ''}/></label></div><label>Lien externe<input name="link" type="url" defaultValue={editing?.link ?? ''}/></label><div className="edit-form-actions"><button type="button" className="secondary-action" onClick={() => { setAdding(false); setEditing(null) }}>{t('admin.cancel')}</button><button className="primary-action" type="submit">{t('admin.save')} <span>✓</span></button></div></form>}<section className="admin-panel"><div className="admin-panel-heading"><div><h2>{items.length} {label.toLowerCase()}</h2><p>Ajoutez, modifiez ou supprimez les entrées de démonstration.</p></div><label className="search-field"><span className="sr-only">{t('common.search')}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('common.search')}/><span>⌕</span></label></div><div className="admin-table-wrap"><table><thead><tr><th>{t('admin.titleField')} FR</th><th>Title EN</th><th>{t('common.category')}</th><th>{t('admin.status')}</th><th>{t('admin.actions')}</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td><strong>{item.title}</strong></td><td>{item.titleEn || '—'}</td><td>{item.category || '—'}</td><td><span className={`status-tag ${item.status.toLowerCase()}`}>{item.status}</span></td><td className="table-actions"><button onClick={() => { setEditing(item); setAdding(false) }}>{t('admin.edit')}</button><button className="danger-action" onClick={() => remove(item.id)}>{t('admin.delete')}</button></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="admin-empty"><p>{t('admin.noData')}</p></div>}</div></section><div className="admin-notice">{t('admin.localNotice')}</div></>
+  const remove = async (record: Row) => {
+    if (!window.confirm('Supprimer cet élément ?')) return
+    const keyName = definition.keyField || 'id'
+    const id = record[keyName]
+    if (!id) return
+    try { await apiSend(`${definition.path}/${encodeURIComponent(String(id))}`, 'DELETE'); reload() }
+    catch (reason) { setNotice(reason instanceof ApiError ? reason.message : 'Suppression impossible.') }
+  }
+  return <><div className="admin-page-heading"><div><p className="eyebrow">CONTENU DU SITE <i/></p><h1>{definition.label}</h1><p>Les modifications sont enregistrées dans la base NovaTech.</p></div><button className="primary-action" onClick={() => { setEditing(null); setNotice('') }}>Ajouter</button></div>{notice && <p className="form-success" role="status">{notice}</p>}{editing !== false && <EditorForm fields={definition.fields} initial={editing || null} title={editing ? 'Modifier' : 'Ajouter'} onCancel={() => setEditing(false)} onSave={save}/>}<ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-panel-heading"><h2>{records.length} entrée(s)</h2></div><div className="admin-table-wrap"><table><thead><tr>{columns.map((field) => <th key={field.name}>{field.label}</th>)}<th>Actions</th></tr></thead><tbody>{records.map((record, index) => <tr key={String(record.id || record.slug || index)}>{columns.map((field) => <td key={field.name}>{field.type === 'checkbox' || typeof record[field.name] === 'boolean' ? (record[field.name] ? 'Oui' : 'Non') : String(record[field.name] ?? '—')}</td>)}<td className="table-actions"><button onClick={() => { setEditing(record); setNotice('') }}>Modifier</button>{(!definition.superAdminDelete || getStoredSession()?.roles.includes('SUPER_ADMIN')) && <button className="danger-action" onClick={() => void remove(record)}>Supprimer</button>}</td></tr>)}</tbody></table>{!loading && records.length === 0 && <div className="admin-empty"><p>Aucun contenu pour le moment.</p></div>}</div></section></>
+}
+
+function TrainingSessionManager() {
+  const { data: courses, loading: coursesLoading, error: coursesError, reload: reloadCourses } = useApiData<TrainingRecord[]>('/admin/trainings')
+  const [courseId, setCourseId] = useState('')
+  const selectedCourse = courseId || courses?.[0]?.id || ''
+  const { data: sessions, loading, error, reload } = useApiData<TrainingSessionRecord[]>(selectedCourse ? `/admin/trainings/${selectedCourse}/sessions` : null)
+  const [editing, setEditing] = useState<TrainingSessionRecord | null | false>(false)
+  const fields: Field[] = [
+    { name: 'courseId', label: 'Formation', type: 'select', required: true, options: (courses || []).map((course) => ({ value: course.id, label: course.titleFr })) },
+    { name: 'startsAt', label: 'Début', type: 'datetime-local', required: true }, { name: 'endsAt', label: 'Fin', type: 'datetime-local', required: true },
+    { name: 'venue', label: 'Lieu', required: true }, { name: 'capacity', label: 'Nombre de places', type: 'number', required: true },
+    { name: 'status', label: 'Statut', type: 'select', required: true, options: ['OPEN', 'FULL', 'CLOSED', 'COMPLETED'].map((value) => ({ value, label: value })) },
+  ]
+  const save = async (body: Row) => {
+    if (editing) await apiSend(`/admin/training-sessions/${editing.id}`, 'PUT', body)
+    else await apiSend('/admin/training-sessions', 'POST', body)
+    setEditing(false); reload()
+  }
+  const remove = async (session: TrainingSessionRecord) => {
+    if (!window.confirm('Supprimer cette session ?')) return
+    try { await apiSend(`/admin/training-sessions/${session.id}`, 'DELETE'); reload() }
+    catch (reason) { window.alert(reason instanceof ApiError ? reason.message : 'Suppression impossible.') }
+  }
+  const superAdmin = getStoredSession()?.roles.includes('SUPER_ADMIN') ?? false
+  return <><div className="admin-page-heading"><div><p className="eyebrow">FORMATIONS <i/></p><h1>Sessions de formation</h1><p>Capacités, lieux, dates et inscriptions par session.</p></div><button className="primary-action" onClick={() => setEditing(null)} disabled={!selectedCourse}>Ajouter une session</button></div><label className="admin-filter">Formation<select value={selectedCourse} onChange={(event) => setCourseId(event.target.value)}><option value="">Choisir une formation</option>{(courses || []).map((course) => <option key={course.id} value={course.id}>{course.titleFr}</option>)}</select></label><ApiState loading={coursesLoading || loading} error={coursesError || error} onRetry={() => { reloadCourses(); reload() }}/>{editing !== false && <EditorForm fields={fields} initial={editing || (selectedCourse ? { courseId: selectedCourse, status: 'OPEN' } : null)} title={editing ? 'Modifier la session' : 'Ajouter une session'} onCancel={() => setEditing(false)} onSave={save}/>}<section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Date</th><th>Lieu</th><th>Places</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{(sessions || []).map((session) => <tr key={session.id}><td>{new Date(session.startsAt).toLocaleString()}</td><td>{session.venue}</td><td>{session.reservedPlaces}/{session.capacity}</td><td>{session.status}</td><td className="table-actions"><button onClick={() => setEditing(session)}>Modifier</button>{superAdmin && <button className="danger-action" onClick={() => void remove(session)}>Supprimer</button>}</td></tr>)}</tbody></table>{!loading && !sessions?.length && <div className="admin-empty">Aucune session pour cette formation.</div>}</div></section></>
 }
 
 function RequestManager() {
   const { requestType = 'messages' } = useParams()
-  const resource = leadResources.find((item) => item.key === requestType) ?? leadResources[0]
-  const [items, setItems] = useState<RecordItem[]>([])
-  useEffect(() => { try { setItems(JSON.parse(localStorage.getItem(resource.storage) || '[]') as RecordItem[]) } catch { setItems([]) } }, [resource])
-  const update = (next: RecordItem[]) => { setItems(next); localStorage.setItem(resource.storage, JSON.stringify(next)) }
-  const exportCsv = () => {
-    const fields = ['name', 'email', 'phone', 'service', 'subject', 'course', 'session', 'description', 'message', 'status', 'createdAt']
-    const quote = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
-    const csv = [fields.join(';'), ...items.map((item) => fields.map((field) => quote(item[field])).join(';'))].join('\r\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${resource.key}-nova-tech.csv`; anchor.click(); URL.revokeObjectURL(url)
-  }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">BOÎTE DE RÉCEPTION <i/></p><h1>{resource.label}</h1><p>Les demandes soumises depuis le site sont conservées localement.</p></div><button className="secondary-action" onClick={exportCsv} disabled={!items.length}>Exporter en CSV</button></div><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Demandeur</th><th>Coordonnées</th><th>Sujet</th><th>Date</th><th>Statut</th><th>Action</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{String(item.name || '—')}</strong><small className="table-subtext">{String(item.message || item.description || '')}</small></td><td>{String(item.email || '')}<small className="table-subtext">{String(item.phone || '')}</small></td><td>{String(item.service || item.subject || item.course || 'Message')}</td><td>{item.createdAt ? new Date(String(item.createdAt)).toLocaleDateString() : '—'}</td><td><select aria-label="Statut" value={String(item.status || 'new')} onChange={(event) => update(items.map((row) => row.id === item.id ? { ...row, status: event.target.value } : row))}><option value="new">Nouveau</option><option value="read">Lu</option><option value="in_progress">En cours</option><option value="done">Traité</option><option value="accepted">Confirmée / accepté</option><option value="cancelled">Annulée / refusé</option></select></td><td><button className="danger-action" onClick={() => update(items.filter((row) => row.id !== item.id))}>Supprimer</button></td></tr>)}</tbody></table>{items.length === 0 && <div className="admin-empty"><span>⌑</span><p>Aucune demande enregistrée.</p></div>}</div></section><div className="admin-notice">L’envoi d’e-mail et la synchronisation des places nécessiteront une API backend.</div></>
+  if (requestType === 'enrollments') return <EnrollmentManager/>
+  const isQuote = requestType === 'quotes'
+  const path = isQuote ? '/admin/quote-requests' : '/admin/contact-messages'
+  return <InquiryManager key={requestType} path={path} kind={isQuote ? 'quote' : 'message'}/>
 }
 
-function AdminSettings() {
-  const [saved, setSaved] = useState(false)
-  const [settings, setSettings] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem('nova-admin-settings') || '{}') as Record<string, string> } catch { return {} } })
-  const { t } = useTranslation()
-  const update = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget).entries()); setSettings(data as Record<string, string>); localStorage.setItem('nova-admin-settings', JSON.stringify(data)); setSaved(true) }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>{t('admin.settings')}</h1><p>Informations locales destinées à préparer la configuration du site.</p></div></div><form className="admin-panel admin-settings-form" onSubmit={update}><label>Nom de l’entreprise<input name="company" defaultValue={settings.company || 'NOVA-TECH-SOLUTION'}/></label><label>E-mail de contact<input name="email" type="email" defaultValue={settings.email || ''}/></label><label>Adresse<input name="address" defaultValue={settings.address || 'Cameroun'}/></label><label>Numéro WhatsApp<input name="whatsapp" defaultValue={settings.whatsapp || ''} placeholder="2376XXXXXXXX"/></label><label>Texte du pied de page<textarea name="footer" rows={3} defaultValue={settings.footer || ''}/></label><button className="primary-action" type="submit">{t('admin.save')} <span>✓</span></button>{saved && <p role="status" className="form-success">Paramètres enregistrés localement.</p>}<p className="admin-notice">{t('admin.localNotice')}</p></form></>
-}
-
-type MediaPreview = { id: string; name: string; size: number; url: string }
-function MediaManager() {
-  const [media, setMedia] = useState<MediaPreview[]>([])
-  const [error, setError] = useState('')
+function InquiryManager({ path, kind }: { path: string; kind: 'quote' | 'message' }) {
+  const { data, loading, error, reload } = useApiData<(QuoteRecord | ContactRecord)[]>(path)
   const [message, setMessage] = useState('')
-  const urls = useRef<string[]>([])
-  useEffect(() => () => { urls.current.forEach((url) => URL.revokeObjectURL(url)) }, [])
-  const addFiles = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.currentTarget.files ?? [])
-    const accepted: MediaPreview[] = []
-    const rejected: string[] = []
-    for (const file of files) {
-      if (!file.type.startsWith('image/')) { rejected.push(`${file.name}: format non image`); continue }
-      if (file.size > 5 * 1024 * 1024) { rejected.push(`${file.name}: plus de 5 Mo`); continue }
-      const url = URL.createObjectURL(file)
-      urls.current.push(url)
-      accepted.push({ id: crypto.randomUUID(), name: file.name, size: file.size, url })
+  const rows = data || []
+  const statusOptions = kind === 'quote' ? ['NEW', 'IN_PROGRESS', 'ACCEPTED', 'REJECTED'] : ['NEW', 'READ', 'RESOLVED']
+  const changeStatus = async (row: QuoteRecord | ContactRecord, status: string) => {
+    const body = kind === 'quote' ? { status, internalNotes: (row as QuoteRecord).internalNotes || '' } : { status }
+    try { await apiSend(`${path}/${row.id}/status`, 'PATCH', body); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Mise à jour impossible.') }
+  }
+  const remove = async (row: QuoteRecord | ContactRecord) => {
+    if (!window.confirm('Supprimer cette demande ?')) return
+    try { await apiSend(`${path}/${row.id}`, 'DELETE'); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Suppression impossible.') }
+  }
+  const reply = async (row: ContactRecord) => {
+    const body = window.prompt(`Répondre à ${row.email} :`)
+    if (!body?.trim()) return
+    try { await apiSend(`${path}/${row.id}/reply`, 'POST', { message: body }); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Envoi impossible.') }
+  }
+  const updateNotes = async (row: QuoteRecord) => {
+    const internalNotes = window.prompt('Notes internes pour cette demande :', row.internalNotes || '')
+    if (internalNotes === null) return
+    try { await apiSend(`${path}/${row.id}/status`, 'PATCH', { status: row.status, internalNotes }); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Mise à jour impossible.') }
+  }
+  return <><div className="admin-page-heading"><div><p className="eyebrow">BOÎTE DE RÉCEPTION <i/></p><h1>{kind === 'quote' ? 'Demandes de devis' : 'Messages de contact'}</h1><p>Demandes reçues depuis le site et enregistrées par le serveur.</p></div></div><ErrorMessage value={message}/><ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Demandeur</th><th>Coordonnées</th><th>{kind === 'quote' ? 'Projet / budget' : 'Message'}</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.fullName}</strong></td><td>{row.email}<small className="table-subtext">{row.phone}</small></td><td>{kind === 'quote' ? <>{(row as QuoteRecord).serviceType}: {(row as QuoteRecord).projectDescription}<small className="table-subtext">{(row as QuoteRecord).budgetRange} · {(row as QuoteRecord).desiredDeadline}</small></> : <>{(row as ContactRecord).subject}: {(row as ContactRecord).message}</>}</td><td>{new Date(row.createdAt).toLocaleDateString()}</td><td><select aria-label={`Statut ${row.fullName}`} value={row.status} onChange={(event) => void changeStatus(row, event.target.value)}>{statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</select></td><td className="table-actions">{kind === 'message' ? <button onClick={() => void reply(row as ContactRecord)}>Répondre</button> : <button onClick={() => void updateNotes(row as QuoteRecord)}>Notes</button>}<button className="danger-action" onClick={() => void remove(row)}>Supprimer</button></td></tr>)}</tbody></table>{!loading && rows.length === 0 && <div className="admin-empty">Aucune demande reçue.</div>}</div></section></>
+}
+
+function EnrollmentManager() {
+  const { data: courses, loading: courseLoading, error: courseError } = useApiData<TrainingRecord[]>('/admin/trainings')
+  const [courseId, setCourseId] = useState('')
+  const selectedCourse = courseId || courses?.[0]?.id || ''
+  const { data: sessions } = useApiData<TrainingSessionRecord[]>(selectedCourse ? `/admin/trainings/${selectedCourse}/sessions` : null)
+  const [sessionId, setSessionId] = useState('')
+  const selectedSession = sessions?.some((item) => item.id === sessionId) ? sessionId : sessions?.[0]?.id || ''
+  const { data, loading, error, reload } = useApiData<TrainingEnrollmentRecord[]>(selectedSession ? `/admin/enrollments?sessionId=${encodeURIComponent(selectedSession)}` : null)
+  const [message, setMessage] = useState('')
+  const changeStatus = async (row: TrainingEnrollmentRecord, status: string) => {
+    try { await apiSend(`/admin/enrollments/${row.id}/status`, 'PATCH', { status }); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Mise à jour impossible.') }
+  }
+  return <><div className="admin-page-heading"><div><p className="eyebrow">INSCRIPTIONS <i/></p><h1>Pré-inscriptions</h1><p>Le statut synchronise les places disponibles de la session.</p></div><button className="secondary-action" disabled={!selectedSession} onClick={() => void adminApiExport(selectedSession)}>Exporter CSV</button></div><div className="form-two-columns admin-filter"><label>Formation<select value={selectedCourse} onChange={(event) => { setCourseId(event.target.value); setSessionId('') }}><option value="">Choisir</option>{(courses || []).map((course) => <option key={course.id} value={course.id}>{course.titleFr}</option>)}</select></label><label>Session<select value={selectedSession} onChange={(event) => setSessionId(event.target.value)}><option value="">Choisir</option>{(sessions || []).map((session) => <option key={session.id} value={session.id}>{new Date(session.startsAt).toLocaleString()} · {session.venue}</option>)}</select></label></div><ErrorMessage value={message}/><ApiState loading={courseLoading || loading} error={courseError || error}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Nom</th><th>E-mail</th><th>Téléphone</th><th>Langue</th><th>Date</th><th>Statut</th></tr></thead><tbody>{(data || []).map((row) => <tr key={row.id}><td>{row.fullName}</td><td>{row.email}</td><td>{row.phone}</td><td>{row.preferredLanguage}</td><td>{new Date(row.createdAt).toLocaleDateString()}</td><td><select value={row.status} aria-label={`Statut ${row.fullName}`} onChange={(event) => void changeStatus(row, event.target.value)}>{['PENDING', 'CONFIRMED', 'CANCELLED'].map((value) => <option key={value}>{value}</option>)}</select></td></tr>)}</tbody></table>{selectedSession && !loading && !data?.length && <div className="admin-empty">Aucune pré-inscription pour cette session.</div>}</div></section></>
+}
+
+async function adminApiExport(sessionId: string) {
+  await apiDownload(`/admin/enrollments/export?sessionId=${encodeURIComponent(sessionId)}`, `pre-inscriptions-${sessionId}.csv`)
+}
+
+function MediaManager() {
+  const { data, loading, error, reload } = useApiData<MediaRecord[]>('/admin/media')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const upload = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setMessage('')
+    const form = event.currentTarget
+    const body = new FormData(form)
+    try { await apiSend('/admin/media', 'POST', body); form.reset(); reload(); setMessage('Image téléversée et optimisée.') }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Téléversement impossible.') }
+    finally { setBusy(false) }
+  }
+  const remove = async (item: MediaRecord) => {
+    if (!window.confirm('Supprimer définitivement cette image ?')) return
+    try { await apiSend(`/admin/media/${item.id}`, 'DELETE'); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Suppression impossible.') }
+  }
+  return <><div className="admin-page-heading"><div><p className="eyebrow">GESTION DES MÉDIAS <i/></p><h1>Médiathèque</h1><p>Images JPEG ou PNG, 10 Mo maximum. Elles sont conservées sur le serveur.</p></div></div><form className="admin-edit-form" onSubmit={(event) => void upload(event)}><label>Fichier image<input type="file" name="file" accept="image/jpeg,image/png" required/></label><div className="form-two-columns"><label>Texte alternatif (FR)<input name="altFr" maxLength={300}/></label><label>Alt text (EN)<input name="altEn" maxLength={300}/></label></div><button className="primary-action" disabled={busy}>{busy ? 'Envoi…' : 'Téléverser'}</button><ErrorMessage value={message}/></form><ApiState loading={loading} error={error} onRetry={reload}/><div className="media-grid">{(data || []).map((item) => <article className="media-item" key={item.id}><img src={apiMediaUrl(item.url)} alt={item.altFr || item.originalName}/><div><strong>{item.originalName}</strong><small>{(item.fileSize / 1024).toFixed(0)} Ko</small><small>{apiMediaUrl(item.url)}</small></div><button className="danger-action" onClick={() => void remove(item)}>Supprimer</button></article>)}</div></>
+}
+
+function SiteSettingsManager() {
+  const { data, loading, error, reload } = useApiData<Record<string, string>>('/admin/settings')
+  if (!data) {
+    return <>
+      <div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>Paramètres du site</h1><p>Coordonnées publiques, réseaux sociaux, SEO et e-mail destinataire des notifications.</p></div></div>
+      <ApiState loading={loading} error={error} onRetry={reload}/>
+    </>
+  }
+  return <SiteSettingsForm initialValues={data} reload={reload}/>
+}
+
+function SiteSettingsForm({ initialValues, reload }: { initialValues: Record<string, string>; reload: () => void }) {
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [newKey, setNewKey] = useState('')
+  const [values, setValues] = useState(initialValues)
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setMessage('')
+    try { await apiSend('/admin/settings', 'PUT', { values }); setMessage('Paramètres enregistrés.'); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Enregistrement impossible.') }
+    finally { setBusy(false) }
+  }
+  return <><div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>Paramètres du site</h1><p>Coordonnées publiques, réseaux sociaux, SEO et e-mail destinataire des notifications.</p></div></div><form className="admin-panel admin-settings-form" onSubmit={(event) => void submit(event)}><div className="form-two-columns">{Object.entries(values).map(([key, value]) => <label key={key}>{key}<input value={value} onChange={(event) => setValues((previous) => ({ ...previous, [key]: event.target.value }))}/></label>)}</div><div className="form-two-columns"><label>Nouvelle clé de paramètre<input value={newKey} onChange={(event) => setNewKey(event.target.value)} placeholder="ex. contact.opening-hours"/></label><button className="secondary-action" type="button" disabled={!newKey.trim() || Object.hasOwn(values, newKey.trim())} onClick={() => { const key = newKey.trim(); if (key && !Object.hasOwn(values, key)) setValues((previous) => ({ ...previous, [key]: '' })); setNewKey('') }}>Ajouter une clé</button></div>{!Object.keys(values).length && <p>Aucun paramètre enregistré. Créez des clés comme site.name, contact.email, social.facebook ou seo.home.title.</p>}<ErrorMessage value={message}/><button className="primary-action" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer les paramètres'}</button></form></>
+}
+
+function NewsletterManager() {
+  const { data, loading, error, reload } = useApiData<NewsletterRecord[]>('/admin/newsletter/subscribers')
+  return <><div className="admin-page-heading"><div><h1>Abonnés à la newsletter</h1><p>Adresses enregistrées avec consentement.</p></div><button className="secondary-action" onClick={() => void apiDownload('/admin/newsletter/subscribers/export', 'newsletter.csv')}>Exporter CSV</button></div><ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>E-mail</th><th>Statut</th><th>Date</th></tr></thead><tbody>{(data || []).map((item) => <tr key={item.id}><td>{item.email}</td><td>{item.active ? 'Actif' : 'Désabonné'}</td><td>{new Date(item.createdAt).toLocaleDateString()}</td></tr>)}</tbody></table></div></section></>
+}
+
+function ActivityManager() {
+  const { data, loading, error, reload } = useApiData<ActivityRecord[]>('/admin/activity?page=0&size=50&sort=createdAt,desc')
+  const rows = Array.isArray(data) ? data : (data as unknown as { content?: ActivityRecord[] } | null)?.content || []
+  return <><div className="admin-page-heading"><div><h1>Journal d’activité</h1><p>Actions administratives récentes.</p></div></div><ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Utilisateur</th><th>Méthode</th><th>Route</th><th>Résultat</th><th>Date</th></tr></thead><tbody>{rows.map((item) => <tr key={item.id}><td>{item.actorEmail}</td><td>{item.method}</td><td>{item.path}</td><td>{item.responseStatus}</td><td>{new Date(item.createdAt).toLocaleString()}</td></tr>)}</tbody></table></div></section></>
+}
+
+function UserManager() {
+  const { data, loading, error, reload } = useApiData<AdminUserRecord[]>('/admin/users')
+  const [editing, setEditing] = useState<AdminUserRecord | null | false>(false)
+  const [message, setMessage] = useState('')
+  const fields: Field[] = [
+    { name: 'email', label: 'E-mail', type: 'email', required: true }, { name: 'displayName', label: 'Nom affiché', required: true },
+    { name: 'password', label: 'Mot de passe (vide pour ne pas changer)', type: 'text' },
+    { name: 'roles', label: 'Rôles (SUPER_ADMIN, EDITOR séparés par des virgules)', type: 'list', required: true }, { name: 'enabled', label: 'Compte actif', type: 'checkbox' },
+  ]
+  const save = async (body: Row) => {
+    body.roles = String(body.roles || '').split(/[\n,]/).map((role) => role.trim()).filter(Boolean)
+    if (!body.password) delete body.password
+    if (editing) await apiSend(`/admin/users/${editing.id}`, 'PUT', body)
+    else await apiSend('/admin/users', 'POST', body)
+    setEditing(false); reload()
+  }
+  const remove = async (user: AdminUserRecord) => {
+    if (!window.confirm(`Supprimer ${user.email} ?`)) return
+    try { await apiSend(`/admin/users/${user.id}`, 'DELETE'); reload() }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Suppression impossible.') }
+  }
+  return <><div className="admin-page-heading"><div><h1>Utilisateurs d’administration</h1><p>Gestion réservée au super administrateur.</p></div><Link className="primary-action" to="/admin/users/new">Créer un compte administrateur</Link></div><ErrorMessage value={message}/>{editing !== false && <EditorForm fields={fields} initial={editing ? { ...editing, roles: editing.roles.join('\n'), password: '' } : { roles: ['EDITOR'], enabled: true }} title={editing ? 'Modifier un utilisateur' : 'Créer un utilisateur'} onCancel={() => setEditing(false)} onSave={save}/>}<ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Nom</th><th>E-mail</th><th>Rôles</th><th>Actif</th><th>Actions</th></tr></thead><tbody>{(data || []).map((user) => <tr key={user.id}><td>{user.displayName}</td><td>{user.email}</td><td>{user.roles.join(', ')}</td><td>{user.enabled ? 'Oui' : 'Non'}</td><td className="table-actions"><button onClick={() => setEditing(user)}>Modifier</button><button className="danger-action" onClick={() => void remove(user)}>Supprimer</button></td></tr>)}</tbody></table></div></section></>
+}
+
+function CreateAdminAccount() {
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    const form = new FormData(event.currentTarget)
+    try {
+      await apiSend('/admin/users', 'POST', {
+        email: String(form.get('email')),
+        displayName: String(form.get('displayName')),
+        password: String(form.get('password')),
+        roles: [String(form.get('role'))],
+        enabled: true,
+      })
+      navigate('/admin/users', { replace: true })
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Impossible de créer ce compte.')
+    } finally {
+      setBusy(false)
     }
-    setMedia((current) => [...accepted, ...current])
-    setError(rejected.join(' · '))
-    setMessage(accepted.length ? `${accepted.length} image(s) chargée(s) dans cette session.` : '')
-    event.currentTarget.value = ''
   }
-  const remove = (item: MediaPreview) => {
-    URL.revokeObjectURL(item.url)
-    urls.current = urls.current.filter((url) => url !== item.url)
-    setMedia((current) => current.filter((entry) => entry.id !== item.id))
-  }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">GESTION DES MÉDIAS <i/></p><h1>Médiathèque</h1><p>Prévisualisez les images dans cette démonstration locale.</p></div></div><section className="admin-panel media-panel"><label className="media-dropzone"><input type="file" accept="image/*" multiple onChange={addFiles}/><span>＋</span><b>Choisir des images</b><small>Images uniquement · 5 Mo maximum par fichier</small></label>{error && <p className="form-error" role="alert">{error}</p>}{message && <p className="form-success" role="status">{message}</p>}<p className="admin-notice">Les fichiers restent en mémoire pendant cette session et ne sont pas envoyés au serveur. L’upload et la compression définitifs nécessiteront le backend.</p></section>{media.length > 0 && <div className="media-grid">{media.map((item) => <article className="media-item" key={item.id}><img src={item.url} alt={item.name}/><div><strong>{item.name}</strong><small>{(item.size / 1024).toFixed(0)} Ko</small></div><button className="danger-action" onClick={() => remove(item)}>Supprimer</button></article>)}</div>}</>
+
+  return <><div className="admin-page-heading"><div><h1>Créer un compte administrateur</h1><p>Cette action est réservée au super administrateur.</p></div></div><form className="admin-edit-form" onSubmit={(event) => void submit(event)}>
+    <label>Adresse e-mail<input name="email" type="email" autoComplete="email" maxLength={254} required/></label>
+    <label>Nom affiché<input name="displayName" autoComplete="name" maxLength={120} required/></label>
+    <label>Mot de passe temporaire<input name="password" type="password" autoComplete="new-password" minLength={12} pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{12,200}" title="12 caractères minimum, avec une minuscule, une majuscule et un chiffre." required/></label>
+    <label>Rôle<select name="role" defaultValue="EDITOR"><option value="EDITOR">Éditeur</option><option value="SUPER_ADMIN">Super administrateur</option></select></label>
+    <p>Le nouvel utilisateur pourra se connecter dès l’enregistrement. Transmets-lui son mot de passe de manière sécurisée.</p>
+    <ErrorMessage value={error}/><div className="form-actions"><Link className="secondary-action" to="/admin/users">Annuler</Link><button className="primary-action" disabled={busy}>{busy ? 'Création…' : 'Créer le compte'}</button></div>
+  </form></>
+}
+
+function Guarded({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  useAuthChange()
+  return isAuthenticated() ? children : <Navigate to="/admin/login" state={{ from: location }} replace/>
+}
+
+function SuperAdminGuard() {
+  const location = useLocation()
+  const session = getStoredSession()
+  if (!isAuthenticated()) return <Navigate to="/admin/login" state={{ from: location }} replace/>
+  return session?.roles.includes('SUPER_ADMIN') ? <Outlet/> : <Navigate to="/admin" replace/>
 }
 
 export function AdminRoutes() {
-  return <Routes><Route path="login" element={<AdminLogin/>}/><Route element={<AdminLayout/>}><Route index element={<AdminDashboard/>}/><Route path="content/:resource" element={<ContentManager/>}/><Route path="requests/:requestType" element={<RequestManager/>}/><Route path="media" element={<MediaManager/>}/><Route path="settings" element={<AdminSettings/>}/><Route path="*" element={<Navigate to="/admin" replace/>}/></Route></Routes>
+  return <Routes>
+    <Route path="login" element={<AdminLogin/>}/><Route path="forgot-password" element={<AdminLogin/>}/><Route path="reset-password" element={<ResetPassword/>}/>
+    <Route element={<Guarded><AdminLayout/></Guarded>}>
+      <Route index element={<AdminDashboard/>}/><Route path="content/:resource" element={<ContentManager/>}/><Route path="sessions" element={<TrainingSessionManager/>}/>
+      <Route path="requests/:requestType" element={<RequestManager/>}/><Route path="media" element={<MediaManager/>}/><Route path="settings" element={<SiteSettingsManager/>}/>
+      <Route path="newsletter" element={<NewsletterManager/>}/>
+      <Route element={<SuperAdminGuard/>}><Route path="activity" element={<ActivityManager/>}/><Route path="users" element={<UserManager/>}/><Route path="users/new" element={<CreateAdminAccount/>}/></Route>
+      <Route path="*" element={<Navigate to="/admin" replace/>}/>
+    </Route>
+  </Routes>
 }

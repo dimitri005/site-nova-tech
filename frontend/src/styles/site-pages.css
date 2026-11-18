@@ -12,7 +12,8 @@
 .public-nav nav a{font-size:13px;font-weight:650;color:#555d6a;transition:color .2s ease}
 .public-nav nav a:hover,.public-nav nav a.is-active{color:var(--site-blue)}
 .public-nav-actions{display:flex;align-items:center;gap:18px}
-.public-quote-link,.primary-action{display:inline-flex;min-height:46px;align-items:center;justify-content:center;gap:14px;padding:0 22px;background:var(--site-blue);color:#fff!important;font-size:12px;font-weight:750;letter-spacing:.02em;border:1px solid var(--site-blue);border-radius:3px;cursor:pointer;transition:background .2s,color .2s,transform .2s}
+.public-account-link{font-size:11px;font-weight:750;color:#3c4655;white-space:nowrap}.public-account-link:hover{color:var(--site-blue)}
+.public-quote-link,.primary-action{display:inline-flex;min-height:46px;align-items:center;justify-content:center;gap:14px;padding:0 22px;background:var(--site-blue,var(--admin-blue,#235daf));color:#fff!important;font-size:12px;font-weight:750;letter-spacing:.02em;border:1px solid var(--site-blue,var(--admin-blue,#235daf));border-radius:3px;cursor:pointer;transition:background .2s,color .2s,transform .2s}
 .public-quote-link:hover,.primary-action:hover{background:#194b95;border-color:#194b95;transform:translateY(-1px)}
 .public-language{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:750;color:#a4aab4}.public-language a{color:#697282}.public-language a[aria-current=page]{color:var(--site-blue)}
 .inner-hero{position:relative;overflow:hidden;padding:77px 0 52px;background:linear-gradient(112deg,#f3f6fb 0%,#fff 70%)}

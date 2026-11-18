@@ -1,88 +1,83 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { getCourses, getProjects, getServices, getTeam, projects, services } from '../data/siteContent'
-import { getSiteSettings } from '../config/siteSettings'
-import { PublicLayout, publicPath } from '../layouts/PublicLayout'
+import { ApiError, apiMediaUrl, apiSend } from '../api/client'
+import { ApiState } from '../api/ApiState'
+import { useApiData } from '../api/hooks'
+import type { ArticleRecord, ProjectRecord, ServiceRecord, StaticPageRecord, TeamRecord, TrainingRecord, TrainingSessionRecord } from '../api/types'
+import { PublicLayout } from '../layouts/PublicLayout'
+import { publicPath } from '../config/publicRoutes'
 import '../styles/site-pages.css'
 
 const LandingPage = lazy(() => import('./LandingPage'))
-
 type Locale = 'fr' | 'en'
 type PageKind = 'about' | 'services' | 'projects' | 'training' | 'team' | 'contact' | 'quote' | 'news' | 'legal' | 'privacy' | 'notFound'
-const local = (lang: Locale, value: { fr: string; en: string }) => value[lang]
-const news = [
-  { slug: 'numerique-pme', category: 'Conseils', title: { fr: 'Comment faire du numérique un levier pour votre PME', en: 'How digital tools can help your small business grow' }, image: projects[0].image, body: { fr: 'Commencez par comprendre les besoins réels de vos clients et de vos équipes. Choisissez ensuite des outils simples, mesurables et adaptés à votre activité.', en: 'Start by understanding the real needs of your customers and team. Then choose tools that are practical, measurable and suited to your business.' } },
-  { slug: 'apprendre-programmation', category: 'Formation', title: { fr: 'Apprendre la programmation en partant de projets concrets', en: 'Learn programming through practical projects' }, image: projects[3].image, body: { fr: 'La pratique régulière et des objectifs progressifs permettent de construire des bases solides en programmation.', en: 'Regular practice and clear milestones help learners build a strong programming foundation.' } },
-  { slug: 'presence-en-ligne', category: 'Actualités', title: { fr: 'Les bases d’une présence en ligne cohérente', en: 'Building a consistent online presence' }, image: projects[1].image, body: { fr: 'Une identité claire, des informations à jour et des contenus utiles renforcent la confiance de vos visiteurs.', en: 'A clear identity, accurate information and useful content help earn visitors’ trust.' } },
-]
+const text = (lang: Locale, fr?: string | null, en?: string | null) => lang === 'fr' ? fr || en || '' : en || fr || ''
 
 function PageHero({ lang, title, intro }: { lang: Locale; title: string; intro?: string }) {
   return <section className="inner-hero"><div className="public-shell"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h1>{title}</h1>{intro && <p>{intro}</p>}<div className="breadcrumbs"><Link to={`/${lang}`}>{lang === 'fr' ? 'Accueil' : 'Home'}</Link><span>/</span><span>{title}</span></div></div></section>
 }
 
-function RequestForm({ lang, kind, courseTitle }: { lang: Locale; kind: 'contact' | 'quote' | 'registration'; courseTitle?: string }) {
-  const { t } = useTranslation()
+function RequestForm({ lang, kind, course, sessions = [] }: { lang: Locale; kind: 'contact' | 'quote' | 'registration'; course?: TrainingRecord; sessions?: TrainingSessionRecord[] }) {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setBusy(true)
-    setError('')
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError(''); setBusy(true)
     const form = event.currentTarget
-    const data = new FormData(form)
-    if (data.get('website')) { setBusy(false); return }
-    const record = Object.fromEntries(data.entries())
-    const key = kind === 'registration' ? 'nova-demo-registrations' : kind === 'quote' ? 'nova-demo-quotes' : 'nova-demo-messages'
-    const previous = JSON.parse(localStorage.getItem(key) || '[]') as object[]
-    localStorage.setItem(key, JSON.stringify([{ ...record, id: crypto.randomUUID(), createdAt: new Date().toISOString(), status: 'new' }, ...previous]))
-    setBusy(false)
-    setSent(true)
-    form.reset()
+    const formData = new FormData(form)
+    const base = { fullName: String(formData.get('fullName') || '').trim(), email: String(formData.get('email') || '').trim(), phone: String(formData.get('phone') || '').trim(), language: lang, consent: formData.get('consent') === 'on', website: String(formData.get('website') || '') }
+    try {
+      if (kind === 'contact') await apiSend('/contact-messages', 'POST', { ...base, subject: formData.get('subject'), message: formData.get('message') })
+      else if (kind === 'quote') await apiSend('/quote-requests', 'POST', { ...base, serviceType: formData.get('serviceType'), projectDescription: formData.get('projectDescription'), budgetRange: formData.get('budgetRange'), desiredDeadline: formData.get('desiredDeadline') })
+      else await apiSend('/enrollments', 'POST', { fullName: base.fullName, email: base.email, phone: base.phone, preferredLanguage: lang, consent: base.consent, website: base.website, sessionId: formData.get('sessionId') })
+      setSent(true); form.reset()
+    } catch (reason) { setError(reason instanceof ApiError ? `${reason.message}${Object.values(reason.fields).length ? ` ${Object.values(reason.fields).join(' ')}` : ''}` : 'Le serveur est injoignable. Réessayez plus tard.') }
+    finally { setBusy(false) }
   }
-  const title = kind === 'quote' ? t('pages.quote') : kind === 'registration' ? (lang === 'fr' ? 'Pré-inscription' : 'Pre-register') : t('pages.contact')
-
-  return <div className="request-card"><div className="request-card-heading"><p className="eyebrow">{lang === 'fr' ? 'ÉCRIVEZ-NOUS' : 'GET IN TOUCH'} <i/></p><h2>{title}</h2><p>{t('common.demo')}</p></div>
-    {sent ? <div className="form-success-card" role="status"><span aria-hidden="true">✓</span><h3>{lang === 'fr' ? 'Demande enregistrée' : 'Request saved'}</h3><p>{t('forms.success')}</p><button className="text-action" type="button" onClick={() => setSent(false)}>{lang === 'fr' ? 'Envoyer une autre demande' : 'Send another request'}</button></div> : <form id="contact-form" className="public-form" onSubmit={submit}>
-      <label>{t('common.name')}<input name="name" autoComplete="name" required minLength={2}/></label>
-      <div className="form-two-columns"><label>{t('common.email')}<input type="email" name="email" autoComplete="email" required/></label><label>{t('common.phone')}<input name="phone" autoComplete="tel" type="tel" required/></label></div>
-      {kind === 'quote' && <><label>{t('forms.serviceType')}<select name="service" required defaultValue=""><option value="" disabled>{t('common.choose', { defaultValue: t('common.all') })}</option>{services.map((service) => <option key={service.slug} value={service.slug}>{local(lang, service.title)}</option>)}</select></label><label>{t('forms.need')}<textarea name="description" rows={4} required minLength={15}/></label><div className="form-two-columns"><label>{t('forms.budget')}<select name="budget" defaultValue=""><option value="">{lang === 'fr' ? 'À définir' : 'To be discussed'}</option><option>Under 250,000 XAF</option><option>250,000–750,000 XAF</option><option>Over 750,000 XAF</option></select></label><label>{t('forms.deadline')}<input name="deadline" placeholder={lang === 'fr' ? 'Ex. 2 mois' : 'e.g. 2 months'}/></label></div></>}
-      {kind === 'registration' && <><input type="hidden" name="course" value={courseTitle || ''}/><label>{t('forms.session')}<select name="session" required defaultValue=""><option value="" disabled>{t('forms.selectSession')}</option><option>{lang === 'fr' ? 'Prochaine session — à confirmer' : 'Next session — to be confirmed'}</option></select></label><label>{lang === 'fr' ? 'Votre objectif' : 'Your learning goal'}<textarea name="message" rows={3}/></label></>}
-      {kind === 'contact' && <><label>{lang === 'fr' ? 'Objet' : 'Subject'}<select name="subject" required defaultValue=""><option value="" disabled>{lang === 'fr' ? 'Sélectionner un sujet' : 'Select a subject'}</option><option>{t('nav.quote')}</option><option>{t('nav.training')}</option><option>{lang === 'fr' ? 'Autre demande' : 'Other request'}</option></select></label><label>{t('common.message')}<textarea name="message" rows={5} required minLength={10}/></label></>}
-      <label className="honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
-      <label className="consent-label"><input type="checkbox" name="consent" required/><span>{t('forms.consent')} <Link to={publicPath(lang, 'privacy')}>{t('pages.privacy')}</Link>.</span></label>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <button className="primary-action" type="submit" disabled={busy}>{busy ? (lang === 'fr' ? 'Envoi…' : 'Sending…') : t('common.send')}<span aria-hidden="true">→</span></button>
-      <p className="demo-caption">{t('common.demo')}</p>
-    </form>}
-  </div>
+  const heading = kind === 'quote' ? (lang === 'fr' ? 'Demander un devis' : 'Request a quote') : kind === 'registration' ? (lang === 'fr' ? 'Pré-inscription' : 'Pre-registration') : (lang === 'fr' ? 'Écrivez-nous' : 'Contact us')
+  if (sent) return <div className="request-card form-success-card" role="status"><span aria-hidden="true">✓</span><h2>{lang === 'fr' ? 'Demande envoyée' : 'Request sent'}</h2><p>{kind === 'registration' ? (lang === 'fr' ? 'Votre pré-inscription est reçue. Notre équipe vous contactera pour confirmer la place. Aucun paiement en ligne n’est demandé.' : 'Your pre-registration was received. Our team will contact you to confirm your place. No online payment is required.') : (lang === 'fr' ? 'Merci. Votre demande a été transmise à notre équipe.' : 'Thank you. Your request has been sent to our team.')}</p><button className="text-action" type="button" onClick={() => setSent(false)}>{lang === 'fr' ? 'Envoyer une autre demande' : 'Send another request'}</button></div>
+  return <div className="request-card"><div className="request-card-heading"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h2>{heading}</h2></div><form className="public-form" onSubmit={(event) => void submit(event)}>
+    <label>{lang === 'fr' ? 'Nom complet' : 'Full name'}<input name="fullName" autoComplete="name" minLength={2} maxLength={160} required/></label>
+    <div className="form-two-columns"><label>E-mail<input type="email" name="email" autoComplete="email" maxLength={254} required/></label><label>{lang === 'fr' ? 'Téléphone' : 'Phone'}<input name="phone" type="tel" autoComplete="tel" maxLength={40}/></label></div>
+    {kind === 'contact' && <><label>{lang === 'fr' ? 'Objet' : 'Subject'}<input name="subject" maxLength={180} required/></label><label>{lang === 'fr' ? 'Votre message' : 'Your message'}<textarea name="message" rows={5} minLength={10} maxLength={12000} required/></label></>}
+    {kind === 'quote' && <><label>{lang === 'fr' ? 'Type de service' : 'Service type'}<input name="serviceType" maxLength={100} required/></label><label>{lang === 'fr' ? 'Décrivez votre besoin' : 'Describe your needs'}<textarea name="projectDescription" rows={5} minLength={15} maxLength={16000} required/></label><div className="form-two-columns"><label>{lang === 'fr' ? 'Budget indicatif' : 'Estimated budget'}<input name="budgetRange" maxLength={100}/></label><label>{lang === 'fr' ? 'Délai souhaité' : 'Desired timeline'}<input name="desiredDeadline" maxLength={160}/></label></div></>}
+    {kind === 'registration' && <><p>{course ? text(lang, course.titleFr, course.titleEn) : ''}</p><label>{lang === 'fr' ? 'Session' : 'Session'}<select name="sessionId" required defaultValue=""><option value="" disabled>{lang === 'fr' ? 'Choisir une session ouverte' : 'Choose an open session'}</option>{sessions.filter((session) => session.status === 'OPEN').map((session) => <option value={session.id} key={session.id}>{new Date(session.startsAt).toLocaleString(lang)} · {session.venue} · {session.placesRemaining} {lang === 'fr' ? 'places restantes' : 'places left'}</option>)}</select></label>{!sessions.some((session) => session.status === 'OPEN') && <p>{lang === 'fr' ? 'Aucune session ouverte actuellement. Contactez-nous pour être informé des prochaines dates.' : 'There is no open session at the moment. Contact us about upcoming dates.'}</p>}</>}
+    <label className="honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
+    <label className="consent-label"><input type="checkbox" name="consent" required/><span>{lang === 'fr' ? 'J’accepte que mes informations soient utilisées pour traiter ma demande.' : 'I agree that my information may be used to process my request.'} <Link to={publicPath(lang, 'privacy')}>{lang === 'fr' ? 'Politique de confidentialité' : 'Privacy policy'}</Link>.</span></label>
+    <ErrorMessage value={error}/><button className="primary-action" type="submit" disabled={busy || (kind === 'registration' && !sessions.some((session) => session.status === 'OPEN'))}>{busy ? (lang === 'fr' ? 'Envoi…' : 'Sending…') : (lang === 'fr' ? 'Envoyer' : 'Send')} <span aria-hidden="true">→</span></button>
+  </form></div>
 }
 
-function ServiceGrid({ lang }: { lang: Locale }) {
-  const { t } = useTranslation()
-  return <div className="content-card-grid service-list">{getServices().map((service, index) => <Link className="public-card service-public-card" key={service.slug} to={publicPath(lang, 'services', service.slug)}><span className="card-index">0{index + 1}</span><span className="card-icon"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="5" width="24" height="17" rx="2"/><path d="M10 27h12m-6-5v5m-5-13 4-4 3 3 5-6m-3 0h3v3"/></svg></span><h2>{local(lang, service.title)}</h2><p>{local(lang, service.summary)}</p><span className="card-link">{t('common.learn')} <b>→</b></span></Link>)}</div>
-}
+function ErrorMessage({ value }: { value: string }) { return value ? <p className="form-error" role="alert">{value}</p> : null }
 
 function ProjectsPage({ lang, detailSlug }: { lang: Locale; detailSlug?: string }) {
   const { t } = useTranslation()
-  const projects = getProjects()
+  const { data, loading, error, reload } = useApiData<ProjectRecord[]>('/projects')
+  const { data: detail } = useApiData<ProjectRecord>(detailSlug ? `/projects/${encodeURIComponent(detailSlug)}` : null)
   const [category, setCategory] = useState('all')
   const [query, setQuery] = useState('')
-  const project = detailSlug ? projects.find((item) => item.slug === detailSlug) : undefined
-  const categories = ['all', 'web', 'mobile', 'marketing', 'training']
-  const visible = useMemo(() => projects.filter((item) => (category === 'all' || item.category === category) && `${local(lang, item.title)} ${item.client} ${item.technologies.join(' ')}`.toLowerCase().includes(query.toLowerCase())), [category, lang, query])
-  if (detailSlug) return project ? <><PageHero lang={lang} title={local(lang, project.title)} intro={local(lang, project.description)}/><section className="content-section"><div className="public-shell project-detail"><img src={project.image} alt={local(lang, project.title)}/><div><p className="eyebrow">{lang === 'fr' ? 'RÉALISATION' : 'PROJECT'} <i/></p><h2>{local(lang, project.title)}</h2><p>{local(lang, project.description)}</p><dl><div><dt>{lang === 'fr' ? 'Client' : 'Client'}</dt><dd>{project.client}</dd></div><div><dt>{lang === 'fr' ? 'Technologies' : 'Technologies'}</dt><dd>{project.technologies.join(' · ')}</dd></div></dl><Link className="primary-action inline-action" to={publicPath(lang, 'quote')}>{t('nav.quote')} <span>→</span></Link></div></div></section></> : <NotFound lang={lang}/>
-  return <><PageHero lang={lang} title={t('pages.projects')} intro={lang === 'fr' ? 'Quelques exemples de projets et d’accompagnements menés avec nos partenaires.' : 'A selection of projects and collaborations with our partners.'}/><section className="content-section"><div className="public-shell"><div className="filter-toolbar"><div className="filter-chips" aria-label={t('common.category')}>{categories.map((item) => <button type="button" key={item} className={category === item ? 'selected' : ''} onClick={() => setCategory(item)}>{item === 'all' ? t('common.all') : item}</button>)}</div><label className="search-field"><span className="sr-only">{t('common.search')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('common.search')}/><span aria-hidden="true">⌕</span></label></div><div className="content-card-grid project-list">{visible.map((item) => <Link to={publicPath(lang, 'projects', item.slug)} className="public-card project-public-card" key={item.slug}><div className="public-card-image"><img loading="lazy" src={item.image} alt=""/><span>{item.category}</span></div><div className="public-card-body"><small>{item.client}</small><h2>{local(lang, item.title)}</h2><p>{local(lang, item.description)}</p><span className="card-link">{t('common.readMore')} <b>→</b></span></div></Link>)}</div>{visible.length === 0 && <p className="empty-state">{t('admin.noData')}</p>}</div></section></>
+  const projects = useMemo(() => data ?? [], [data])
+  const project = detailSlug ? detail || projects.find((item) => item.slug === detailSlug) : undefined
+  const categories = [...new Set(projects.map((item) => item.category))]
+  const visible = useMemo(() => projects.filter((item) => (category === 'all' || item.category === category) && `${text(lang, item.titleFr, item.titleEn)} ${item.clientName || ''} ${item.technologies.join(' ')}`.toLowerCase().includes(query.toLowerCase())), [category, lang, projects, query])
+  if (detailSlug && project) return <><PageHero lang={lang} title={text(lang, project.titleFr, project.titleEn)} intro={text(lang, project.descriptionFr, project.descriptionEn)}/><section className="content-section"><div className="public-shell project-detail"><img src={apiMediaUrl(project.coverImageUrl)} alt={text(lang, project.titleFr, project.titleEn)}/><div><p className="eyebrow">{lang === 'fr' ? 'RÉALISATION' : 'PROJECT'} <i/></p><h2>{text(lang, project.titleFr, project.titleEn)}</h2><p>{text(lang, project.descriptionFr, project.descriptionEn)}</p><dl><div><dt>Client</dt><dd>{project.clientName || '—'}</dd></div><div><dt>Technologies</dt><dd>{project.technologies.join(' · ')}</dd></div></dl>{project.galleryUrls.map((url) => <img key={url} src={apiMediaUrl(url)} alt="" loading="lazy"/>)}{project.projectUrl && <a className="primary-action inline-action" href={project.projectUrl} target="_blank" rel="noreferrer">{lang === 'fr' ? 'Voir le projet' : 'View project'} ↗</a>}</div></div></section></>
+  if (detailSlug && !loading && !error) return <NotFound lang={lang}/>
+  return <><PageHero lang={lang} title={t('pages.projects')} intro={lang === 'fr' ? 'Réalisations publiées par notre équipe.' : 'Projects published by our team.'}/><section className="content-section"><div className="public-shell"><div className="filter-toolbar"><div className="filter-chips"><button type="button" className={category === 'all' ? 'selected' : ''} onClick={() => setCategory('all')}>{t('common.all')}</button>{categories.map((item) => <button type="button" key={item} className={category === item ? 'selected' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div><label className="search-field"><span className="sr-only">{t('common.search')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('common.search')}/></label></div><ApiState loading={loading} error={error} onRetry={reload}/><div className="content-card-grid project-list">{visible.map((item) => <Link to={publicPath(lang, 'projects', item.slug)} className="public-card project-public-card" key={item.id}><div className="public-card-image"><img loading="lazy" src={apiMediaUrl(item.coverImageUrl)} alt=""/><span>{item.category}</span></div><div className="public-card-body"><small>{item.clientName}</small><h2>{text(lang, item.titleFr, item.titleEn)}</h2><p>{text(lang, item.descriptionFr, item.descriptionEn)}</p><span className="card-link">{t('common.readMore')} <b>→</b></span></div></Link>)}</div>{!loading && !error && !visible.length && <p className="empty-state">{t('admin.noData')}</p>}</div></section></>
 }
 
 function TrainingPage({ lang, detailSlug }: { lang: Locale; detailSlug?: string }) {
   const { t } = useTranslation()
-  const courses = getCourses()
-  const course = detailSlug ? courses.find((item) => item.slug === detailSlug) : undefined
-  if (detailSlug) return course ? <><PageHero lang={lang} title={local(lang, course.title)} intro={local(lang, course.summary)}/><section className="content-section"><div className="public-shell course-detail"><div className="course-main"><div className="course-callout"><strong>{local(lang, course.duration)}</strong><span>{local(lang, course.price)}</span></div><h2>{lang === 'fr' ? 'Ce que vous allez apprendre' : 'What you will learn'}</h2><ul className="check-list">{course.program.map((item) => <li key={item.fr}><span>✓</span>{local(lang, item)}</li>)}</ul><h2>{lang === 'fr' ? 'À qui s’adresse cette formation ?' : 'Who is this course for?'}</h2><p>{local(lang, course.audience)}</p><h3>{lang === 'fr' ? 'Prérequis' : 'Prerequisites'}</h3><p>{local(lang, course.prerequisites)}</p><h2>{lang === 'fr' ? 'Sessions à venir' : 'Upcoming sessions'}</h2>{course.sessions.map((session) => <article className="session-row" key={session.date.fr}><div><b>{local(lang, session.date)}</b><span>{local(lang, session.location)}</span></div><span className="session-spots">{session.remaining} {lang === 'fr' ? 'places indicatives' : 'indicative places'}</span></article>)}</div><RequestForm lang={lang} kind="registration" courseTitle={local(lang, course.title)}/></div></section></> : <NotFound lang={lang}/>
-  return <><PageHero lang={lang} title={t('pages.training')} intro={lang === 'fr' ? 'Des formations en présentiel pour apprendre en pratiquant, à votre rythme.' : 'In-person courses that help you learn by doing, at your own pace.'}/><section className="content-section"><div className="public-shell content-card-grid course-list">{courses.map((item, index) => <Link className="public-card course-card" to={publicPath(lang, 'training', item.slug)} key={item.slug}><span className="course-count">0{index + 1}</span><p className="eyebrow">{lang === 'fr' ? 'FORMATION EN PRÉSENTIEL' : 'IN-PERSON COURSE'} <i/></p><h2>{local(lang, item.title)}</h2><p>{local(lang, item.summary)}</p><div className="course-meta"><span>{local(lang, item.duration)}</span><span>{local(lang, item.price)}</span></div><span className="card-link">{t('common.learn')} <b>→</b></span></Link>)}</div></section></>
+  const { data, loading, error, reload } = useApiData<TrainingRecord[]>('/trainings')
+  const { data: detail } = useApiData<TrainingRecord>(detailSlug ? `/trainings/${encodeURIComponent(detailSlug)}` : null)
+  const courses = data || []
+  const course = detailSlug ? detail || courses.find((item) => item.slug === detailSlug) : undefined
+  const { data: sessions, loading: sessionsLoading, error: sessionsError } = useApiData<TrainingSessionRecord[]>(course ? `/trainings/${encodeURIComponent(course.slug)}/sessions` : null)
+  if (detailSlug && !loading && !error && !course) return <NotFound lang={lang}/>
+  if (detailSlug && course) return <><PageHero lang={lang} title={text(lang, course.titleFr, course.titleEn)} intro={text(lang, course.descriptionFr, course.descriptionEn)}/><section className="content-section"><div className="public-shell course-detail"><div className="course-main"><div className="course-callout"><strong>{course.durationHours} {lang === 'fr' ? 'heures' : 'hours'}</strong><span>{course.indicativePrice ?? '—'} {course.currency || 'XAF'}</span></div><h2>{lang === 'fr' ? 'Objectifs' : 'Objectives'}</h2><p>{text(lang, course.objectivesFr, course.objectivesEn)}</p><h2>{lang === 'fr' ? 'Programme' : 'Program'}</h2><div className="course-program" dangerouslySetInnerHTML={{ __html: text(lang, course.programFr, course.programEn) }}/><h2>{lang === 'fr' ? 'Public cible' : 'Target audience'}</h2><p>{text(lang, course.audienceFr, course.audienceEn)}</p><h3>{lang === 'fr' ? 'Prérequis' : 'Prerequisites'}</h3><p>{text(lang, course.prerequisitesFr, course.prerequisitesEn)}</p><h2>{lang === 'fr' ? 'Sessions à venir' : 'Upcoming sessions'}</h2><ApiState loading={sessionsLoading} error={sessionsError}/>{(sessions || []).map((session) => <article className="session-row" key={session.id}><div><b>{new Date(session.startsAt).toLocaleString(lang)}</b><span>{session.venue}</span></div><span className="session-spots">{session.placesRemaining} {lang === 'fr' ? 'places restantes' : 'places left'}</span></article>)}</div><RequestForm lang={lang} kind="registration" course={course} sessions={sessions || []}/></div></section></>
+  return <><PageHero lang={lang} title={t('pages.training')} intro={lang === 'fr' ? 'Formations en présentiel proposées par NovaTech.' : 'In-person courses offered by NovaTech.'}/><section className="content-section"><div className="public-shell content-card-grid course-list"><ApiState loading={loading} error={error} onRetry={reload}/>{courses.map((item, index) => <Link className="public-card course-card" to={publicPath(lang, 'training', item.slug)} key={item.id}><span className="course-count">{String(index + 1).padStart(2, '0')}</span><p className="eyebrow">{lang === 'fr' ? 'FORMATION EN PRÉSENTIEL' : 'IN-PERSON COURSE'} <i/></p><h2>{text(lang, item.titleFr, item.titleEn)}</h2><p>{text(lang, item.descriptionFr, item.descriptionEn)}</p><div className="course-meta"><span>{item.durationHours} h</span><span>{item.indicativePrice ?? '—'} {item.currency || 'XAF'}</span></div><span className="card-link">{t('common.learn')} <b>→</b></span></Link>)}</div></section></>
 }
 
 function NotFound({ lang }: { lang: Locale }) {
@@ -97,62 +92,72 @@ export function LocalizedPage() {
   const { i18n } = useTranslation()
   useEffect(() => {
     if (pathLang !== 'fr' && pathLang !== 'en') return
-    void i18n.changeLanguage(lang)
-    localStorage.setItem('nova-language', lang)
-    document.documentElement.lang = lang
+    void i18n.changeLanguage(lang); localStorage.setItem('nova-language', lang); document.documentElement.lang = lang
   }, [i18n, lang, pathLang])
-
   if (pathLang !== 'fr' && pathLang !== 'en') return <NotFound lang="fr"/>
-
   const segments = location.pathname.split('/').filter(Boolean).slice(1)
   const root = segments[0]
   const slug = segments[1]
-  let page: PageKind = 'notFound'
-  if (!root) return <LandingPageBridge lang={lang}/>
-  const routeMap: Record<string, PageKind> = {
-    'a-propos': 'about', about: 'about', services: 'services', realisations: 'projects', projects: 'projects', formations: 'training', training: 'training', equipe: 'team', team: 'team', contact: 'contact', devis: 'quote', quote: 'quote', actualites: 'news', news: 'news', 'mentions-legales': 'legal', 'legal-notice': 'legal', confidentialite: 'privacy', privacy: 'privacy',
-  }
-  page = routeMap[root] ?? 'notFound'
+  if (!root) return <Suspense fallback={<div className="page-loading" role="status">NOVA-TECH-SOLUTION</div>}><LandingPage/></Suspense>
+  const routeMap: Record<string, PageKind> = { 'a-propos': 'about', about: 'about', services: 'services', realisations: 'projects', projects: 'projects', formations: 'training', training: 'training', equipe: 'team', team: 'team', contact: 'contact', devis: 'quote', quote: 'quote', actualites: 'news', news: 'news', 'mentions-legales': 'legal', 'legal-notice': 'legal', confidentialite: 'privacy', privacy: 'privacy' }
+  const page = routeMap[root] ?? 'notFound'
   return <PublicLayout lang={lang}><ContentPage lang={lang} page={page} slug={slug}/></PublicLayout>
 }
 
-function LandingPageBridge({ lang }: { lang: Locale }) {
-  const { i18n } = useTranslation()
-  useEffect(() => { void i18n.changeLanguage(lang); localStorage.setItem('nova-language', lang); document.documentElement.lang = lang }, [i18n, lang])
-  return <Suspense fallback={<div className="page-loading" role="status">NOVA-TECH-SOLUTION</div>}><LandingPage/></Suspense>
+export function NewsletterUnsubscribe() {
+  const [params] = useSearchParams()
+  const token = params.get('token') || ''
+  const [status, setStatus] = useState<'loading' | 'done' | 'error'>(token ? 'loading' : 'error')
+  const submitted = useRef(false)
+  useEffect(() => {
+    if (!token || submitted.current) return
+    submitted.current = true
+    apiSend(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`, 'POST', undefined)
+      .then(() => setStatus('done'))
+      .catch(() => setStatus('error'))
+  }, [token])
+  const language: Locale = localStorage.getItem('nova-language') === 'en' ? 'en' : 'fr'
+  const message = status === 'loading'
+    ? (language === 'fr' ? 'Traitement du désabonnement…' : 'Processing your unsubscribe…')
+    : status === 'done'
+      ? (language === 'fr' ? 'Vous êtes désabonné(e) de la newsletter NovaTech.' : 'You have been unsubscribed from the NovaTech newsletter.')
+      : (language === 'fr' ? 'Ce lien de désabonnement est invalide ou a déjà été utilisé.' : 'This unsubscribe link is invalid or has already been used.')
+  return <PublicLayout lang={language}><main className="not-found"><h1>{language === 'fr' ? 'Newsletter' : 'Newsletter'}</h1><p role={status === 'error' ? 'alert' : 'status'}>{message}</p><Link className="primary-action inline-action" to={`/${language}`}>{language === 'fr' ? 'Retour au site' : 'Back to the website'} →</Link></main></PublicLayout>
 }
 
 function ContentPage({ lang, page, slug }: { lang: Locale; page: PageKind; slug?: string }) {
   const { t } = useTranslation()
-  const settings = getSiteSettings()
+  const pageSlug = page === 'about' ? 'about' : page === 'legal' ? 'legal' : page === 'privacy' ? 'privacy' : null
+  const { data: staticPage, loading: pageLoading, error: pageError, reload } = useApiData<StaticPageRecord>(pageSlug ? `/site-content/pages/${pageSlug}` : null)
+  const { data: publicPages } = useApiData<StaticPageRecord[]>(pageSlug ? '/site-content/pages' : null)
+  const resolvedStaticPage = staticPage || publicPages?.find((item) => item.slug === pageSlug)
+  const { data: services, loading: servicesLoading, error: servicesError, reload: reloadServices } = useApiData<ServiceRecord[]>('/services')
+  const { data: serviceDetail } = useApiData<ServiceRecord>(page === 'services' && slug ? `/services/${encodeURIComponent(slug)}` : null)
+  const { data: team, loading: teamLoading, error: teamError, reload: reloadTeam } = useApiData<TeamRecord[]>(page === 'team' ? '/team' : null)
+  const { data: articles, loading: articlesLoading, error: articlesError, reload: reloadArticles } = useApiData<ArticleRecord[]>('/articles')
+  const { data: articleDetail } = useApiData<ArticleRecord>(page === 'news' && slug ? `/articles/${encodeURIComponent(slug)}` : null)
+  const { data: settings } = useApiData<Record<string, string>>('/settings/public')
   const title = t(`pages.${page}`, { defaultValue: t('pages.notFound') })
   useEffect(() => {
-    document.title = `${title} | NOVA-TECH-SOLUTION`
+    document.title = `${resolvedStaticPage ? text(lang, resolvedStaticPage.titleFr, resolvedStaticPage.titleEn) : title} | NOVA-TECH-SOLUTION`
     const description = document.querySelector('meta[name="description"]')
-    description?.setAttribute('content', `${title} — NOVA-TECH-SOLUTION, solutions numériques et formations à Cameroon.`)
-  }, [title])
+    description?.setAttribute('content', settings?.[`seo.${page}.description.${lang}`] || `${title} — NOVA-TECH-SOLUTION`)
+  }, [lang, page, resolvedStaticPage, settings, title])
   if (page === 'notFound') return <NotFound lang={lang}/>
   if (page === 'projects') return <ProjectsPage lang={lang} detailSlug={slug}/>
   if (page === 'training') return <TrainingPage lang={lang} detailSlug={slug}/>
   if (page === 'services') {
-    const service = slug ? getServices().find((item) => item.slug === slug) : undefined
-    if (slug && !service) return <NotFound lang={lang}/>
-    return service ? <><PageHero lang={lang} title={local(lang, service.title)} intro={local(lang, service.description)}/><section className="content-section"><div className="public-shell service-detail"><div><p className="eyebrow">{lang === 'fr' ? 'NOTRE ACCOMPAGNEMENT' : 'HOW WE HELP'} <i/></p><h2>{local(lang, service.summary)}</h2><p>{local(lang, service.description)}</p><p>{lang === 'fr' ? 'Nous définissons avec vous les priorités, le périmètre et les étapes de mise en œuvre pour transformer votre besoin en résultat concret.' : 'Together we define priorities, scope and next steps to turn your needs into a practical result.'}</p><Link className="primary-action inline-action" to={publicPath(lang, 'quote')}>{t('nav.quote')} <span>→</span></Link></div><div className="service-detail-aside"><h3>{lang === 'fr' ? 'Parlons de vos besoins' : 'Let’s discuss your needs'}</h3><p>{lang === 'fr' ? 'Présentez-nous votre projet et nous vous recontacterons.' : 'Tell us about your project and we will get back to you.'}</p><Link to={publicPath(lang, 'contact')}>{t('nav.contact')} →</Link></div></div></section><section className="content-section content-section-soft"><div className="public-shell"><SectionHeading eyebrow={lang === 'fr' ? 'NOS PÔLES' : 'OUR SERVICES'} title={t('pages.services')}/><ServiceGrid lang={lang}/></div></section></> : <><PageHero lang={lang} title={title} intro={lang === 'fr' ? 'Découvrez les cinq domaines dans lesquels nous accompagnons les organisations et les apprenants.' : 'Explore the five areas where we support organizations and learners.'}/><section className="content-section"><div className="public-shell"><ServiceGrid lang={lang}/></div></section></>
+    const service = slug ? serviceDetail || services?.find((item) => item.slug === slug) : null
+    if (slug && !service && !servicesLoading) return <NotFound lang={lang}/>
+    return <><PageHero lang={lang} title={service ? text(lang, service.titleFr, service.titleEn) : title} intro={service ? text(lang, service.descriptionFr, service.descriptionEn) : lang === 'fr' ? 'Nos services et expertises.' : 'Our services and areas of expertise.'}/><section className="content-section"><div className="public-shell">{service && <div className="service-detail"><div><p className="eyebrow">{service.category} <i/></p><h2>{text(lang, service.titleFr, service.titleEn)}</h2><p>{text(lang, service.descriptionFr, service.descriptionEn)}</p><Link className="primary-action inline-action" to={publicPath(lang, 'quote')}>{t('nav.quote')} →</Link></div></div>}<ApiState loading={servicesLoading} error={servicesError} onRetry={reloadServices}/><div className="content-card-grid service-list">{(services || []).map((item) => <Link className="public-card service-public-card" key={item.id} to={publicPath(lang, 'services', item.slug)}><span className="card-index">{String(item.displayOrder).padStart(2, '0')}</span><h2>{text(lang, item.titleFr, item.titleEn)}</h2><p>{text(lang, item.descriptionFr, item.descriptionEn)}</p></Link>)}</div></div></section></>
   }
-  if (page === 'about') return <><PageHero lang={lang} title={title} intro={t('about.intro')}/><section className="content-section"><div className="public-shell about-page-grid"><div className="about-page-image"><img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1200&q=80" alt={lang === 'fr' ? 'Équipe en réunion dans un espace de travail' : 'Team meeting in a workspace'} loading="lazy"/><span>NOVA<br/>TECH</span></div><div className="about-page-copy"><p className="eyebrow">{lang === 'fr' ? 'NOTRE HISTOIRE' : 'OUR STORY'} <i/></p><h2>{lang === 'fr' ? 'La technologie pensée pour les personnes.' : 'Technology designed for people.'}</h2><p>{t('about.intro')}</p><p>{lang === 'fr' ? 'Basée au Cameroun, NOVA-TECH-SOLUTION réunit le développement, le conseil et la formation pour rendre les outils numériques plus utiles au quotidien.' : 'Based in Cameroon, NOVA-TECH-SOLUTION brings development, consulting and training together to make digital tools more useful every day.'}</p></div></div><div className="public-shell value-grid">{(['mission','vision','values'] as const).map((key, index) => <article className="public-card value-card" key={key}><span>0{index + 1}</span><h3>{t(`about.${key}`)}</h3><p>{t(`about.${key}Text`)}</p></article>)}</div></section></>
-  if (page === 'team') return <><PageHero lang={lang} title={title} intro={lang === 'fr' ? 'Les personnes qui font avancer vos projets et vos compétences.' : 'The people moving your projects and skills forward.'}/><section className="content-section"><div className="public-shell content-card-grid team-grid">{getTeam().map((member) => <article className="public-card team-card" key={member.name}><div className="team-photo"><img src={member.image} alt={member.name} loading="lazy"/></div><div className="public-card-body"><p className="eyebrow">{local(lang, member.role)} <i/></p><h2>{member.name}</h2><p>{local(lang, member.bio)}</p></div></article>)}</div></section></>
-  if (page === 'contact' || page === 'quote') return <><PageHero lang={lang} title={title} intro={page === 'quote' ? (lang === 'fr' ? 'Décrivez votre besoin, votre budget indicatif et votre calendrier.' : 'Tell us about your needs, estimated budget and desired timeline.') : t('home.contact')}/><section className="content-section"><div className="public-shell contact-layout"><RequestForm lang={lang} kind={page === 'quote' ? 'quote' : 'contact'}/><aside className="contact-aside"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h2>{lang === 'fr' ? 'À votre écoute au Cameroun' : 'Here to help in Cameroon'}</h2><p>{lang === 'fr' ? 'Contactez-nous pour discuter de votre projet, d’une formation ou d’un partenariat.' : 'Get in touch to discuss a project, a course or a partnership.'}</p><p>{settings.email || (lang === 'fr' ? 'Adresse e-mail à configurer' : 'Email to be configured')}</p><p>{lang === 'fr' ? 'Cameroun' : 'Cameroon'}</p><div className="map-placeholder" role="img" aria-label={lang === 'fr' ? 'Carte de Cameroun' : 'Map of Cameroon'}><span>{lang === 'fr' ? 'CAMEROUN' : 'CAMEROON'}</span><small>{lang === 'fr' ? 'Cameroun' : 'Cameroon'}</small><i/></div></aside></div></section></>
+  if (page === 'team') return <><PageHero lang={lang} title={title} intro={lang === 'fr' ? 'Les personnes qui font avancer vos projets.' : 'The people moving your projects forward.'}/><section className="content-section"><div className="public-shell"><ApiState loading={teamLoading} error={teamError} onRetry={reloadTeam}/><div className="content-card-grid team-grid">{(team || []).map((member) => <article className="public-card team-card" key={member.id}><div className="team-photo"><img src={apiMediaUrl(member.photoUrl)} alt={member.fullName} loading="lazy"/></div><div className="public-card-body"><p className="eyebrow">{text(lang, member.positionFr, member.positionEn)} <i/></p><h2>{member.fullName}</h2><p>{text(lang, member.biographyFr, member.biographyEn)}</p></div></article>)}</div></div></section></>
+  if (page === 'contact' || page === 'quote') return <><PageHero lang={lang} title={title} intro={page === 'quote' ? (lang === 'fr' ? 'Décrivez votre besoin et votre budget indicatif.' : 'Tell us about your needs and estimated budget.') : (lang === 'fr' ? 'Parlons de votre projet ou de votre formation.' : 'Get in touch about a project or course.')}/><section className="content-section"><div className="public-shell contact-layout"><RequestForm lang={lang} kind={page === 'quote' ? 'quote' : 'contact'}/><aside className="contact-aside"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h2>{lang === 'fr' ? 'À votre écoute au Cameroun' : 'Here to help in Cameroon'}</h2><p>{settings?.['contact.email'] || '—'}</p><p>{settings?.['contact.address'] || (lang === 'fr' ? 'Cameroun' : 'Cameroon')}</p><p>{settings?.['contact.hours'] || ''}</p><div className="map-placeholder" role="img" aria-label={lang === 'fr' ? 'Carte du Cameroun' : 'Map of Cameroon'}><span>{lang === 'fr' ? 'CAMEROUN' : 'CAMEROON'}</span></div></aside></div></section></>
   if (page === 'news') {
-    const article = slug ? news.find((item) => item.slug === slug) : undefined
-    if (slug && !article) return <NotFound lang={lang}/>
-    return article ? <><PageHero lang={lang} title={local(lang, article.title)} intro={article.category}/><article className="content-section"><div className="public-shell article-detail"><img src={article.image} alt=""/><div><p className="eyebrow">{article.category} <i/></p><h2>{local(lang, article.title)}</h2><p>{local(lang, article.body)}</p><p>{lang === 'fr' ? 'Vous souhaitez en savoir plus sur nos solutions et nos formations ? Contactez notre équipe pour échanger sur votre projet.' : 'Would you like to learn more about our services and training? Contact our team to discuss your project.'}</p></div></div></article></> : <><PageHero lang={lang} title={title} intro={lang === 'fr' ? 'Conseils, actualités et ressources autour du numérique et de la formation.' : 'Ideas, updates and resources on technology and learning.'}/><section className="content-section"><div className="public-shell content-card-grid article-list">{news.map((item) => <Link className="public-card project-public-card" key={item.slug} to={publicPath(lang, 'news', item.slug)}><div className="public-card-image"><img src={item.image} alt="" loading="lazy"/><span>{item.category}</span></div><div className="public-card-body"><h2>{local(lang, item.title)}</h2><p>{local(lang, item.body)}</p><span className="card-link">{t('common.readMore')} <b>→</b></span></div></Link>)}</div></section></>
+    const article = slug ? articleDetail || articles?.find((item) => item.slug === slug) : null
+    if (slug && !article && !articlesLoading) return <NotFound lang={lang}/>
+    return article ? <><PageHero lang={lang} title={text(lang, article.titleFr, article.titleEn)} intro={text(lang, article.excerptFr, article.excerptEn)}/><article className="content-section"><div className="public-shell article-detail"><img src={apiMediaUrl(article.coverImageUrl)} alt=""/><div><p className="eyebrow">{article.category} <i/></p><div dangerouslySetInnerHTML={{ __html: text(lang, article.bodyFr, article.bodyEn) }}/></div></div></article></> : <><PageHero lang={lang} title={title}/><section className="content-section"><div className="public-shell"><ApiState loading={articlesLoading} error={articlesError} onRetry={reloadArticles}/><div className="content-card-grid article-list">{(articles || []).map((item) => <Link className="public-card project-public-card" key={item.id} to={publicPath(lang, 'news', item.slug)}><div className="public-card-image"><img src={apiMediaUrl(item.coverImageUrl)} alt="" loading="lazy"/><span>{item.category}</span></div><div className="public-card-body"><h2>{text(lang, item.titleFr, item.titleEn)}</h2><p>{text(lang, item.excerptFr, item.excerptEn)}</p></div></Link>)}</div></div></section></>
   }
-  const legal = page === 'legal'
-  return <><PageHero lang={lang} title={title} intro={legal ? (lang === 'fr' ? 'Informations relatives à l’éditeur et à l’utilisation de ce site.' : 'Information about this website and its publisher.') : (lang === 'fr' ? 'Comment vos données sont collectées et utilisées.' : 'How your data is collected and used.')}/><section className="content-section"><div className="public-shell legal-content"><h2>{legal ? (lang === 'fr' ? 'Éditeur du site' : 'Website publisher') : (lang === 'fr' ? 'Données collectées' : 'Information we collect')}</h2><p>{lang === 'fr' ? 'NOVA-TECH-SOLUTION · Cameroun · Adresse e-mail à configurer. Les informations affichées ici sont à compléter et valider par l’entreprise avant mise en ligne.' : 'NOVA-TECH-SOLUTION · Cameroon · Email to be configured. The information shown here must be completed and approved by the company before launch.'}</p><h2>{legal ? (lang === 'fr' ? 'Responsabilité' : 'Liability') : (lang === 'fr' ? 'Utilisation des informations' : 'How we use information')}</h2><p>{lang === 'fr' ? 'Les formulaires de cette version frontend sont des démonstrations locales. Ils ne transmettent aucune donnée à l’entreprise.' : 'Forms in this frontend version are local demos and do not send data to the company.'}</p><h2>{lang === 'fr' ? 'Contact' : 'Contact'}</h2><p>{settings.email || (lang === 'fr' ? 'Adresse e-mail à configurer' : 'Email to be configured')}</p></div></section></>
+  if (page === 'about' || page === 'legal' || page === 'privacy') return <><ApiState loading={pageLoading} error={pageError} onRetry={reload}/><PageHero lang={lang} title={resolvedStaticPage ? text(lang, resolvedStaticPage.titleFr, resolvedStaticPage.titleEn) : title}/><section className="content-section"><article className="public-shell legal-content">{resolvedStaticPage ? <div dangerouslySetInnerHTML={{ __html: text(lang, resolvedStaticPage.bodyFr, resolvedStaticPage.bodyEn) }}/> : <p>{lang === 'fr' ? 'Cette page sera publiée par l’équipe NovaTech.' : 'This page will be published by the NovaTech team.'}</p>}</article></section></>
+  return <NotFound lang={lang}/>
 }
-
-function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
-  return <div className="page-section-heading"><p className="eyebrow">{eyebrow} <i/></p><h2>{title}</h2></div>
-}
-
-export { PageHero, RequestForm, ServiceGrid, SectionHeading, NotFound }

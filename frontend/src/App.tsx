@@ -5,6 +5,7 @@ import './styles/site-pages.css'
 
 const AdminRoutes = lazy(() => import('./pages/AdminPages').then((module) => ({ default: module.AdminRoutes })))
 const LocalizedPage = lazy(() => import('./pages/PublicPages').then((module) => ({ default: module.LocalizedPage })))
+const NewsletterUnsubscribe = lazy(() => import('./pages/PublicPages').then((module) => ({ default: module.NewsletterUnsubscribe })))
 
 function RouteFallback() {
   return <div className="page-loading" role="status">NOVA-TECH-SOLUTION</div>
@@ -19,6 +20,7 @@ export default function App() {
   return <ErrorBoundary><BrowserRouter><Suspense fallback={<RouteFallback/>}><Routes>
     <Route path="/" element={<Navigate to={`/${preferredLanguage}`} replace/>}/>
     <Route path="/admin/*" element={<AdminRoutes/>}/>
+    <Route path="/newsletter/unsubscribe" element={<NewsletterUnsubscribe/>}/>
     <Route path="/:lang/*" element={<LocalizedPage/>}/>
     <Route path="*" element={<RouteNotFound/>}/>
   </Routes></Suspense></BrowserRouter></ErrorBoundary>

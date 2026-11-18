@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="170" height="340" viewBox="0 0 170 340" fill="none">
+  <g stroke="#2868c5" stroke-width="1.35" stroke-linecap="square" stroke-linejoin="miter" opacity=".82">
+    <path d="M0 17h36v17h30v24h42v18h28M0 46h17v28h24v25h36v18h24M0 84h37v17h42v-22h27V57h28M0 122h28v20h44v28h31v-19h31M0 161h16v26h37v18h31v25h34M0 202h41v-17h30v26h39v17h35M0 244h23v-26h37v29h35v-19h38M0 284h44v-22h34v24h40v18h29M17 0v34m32 0v25h28v28m26-29v22h30v26m-61 36v28h25m-45 17v24h26m45-44v29h26m-88 48v25h34m45-28v28h29"/>
+  </g>
+  <g fill="#2868c5" opacity=".95"><circle cx="36" cy="17" r="3"/><circle cx="66" cy="58" r="3"/><circle cx="41" cy="74" r="3"/><circle cx="79" cy="101" r="3"/><circle cx="37" cy="101" r="3"/><circle cx="72" cy="170" r="3"/><circle cx="53" cy="205" r="3"/><circle cx="71" cy="211" r="3"/><circle cx="60" cy="247" r="3"/><circle cx="78" cy="286" r="3"/><circle cx="118" cy="286" r="3"/><rect x="108" y="70" width="10" height="10"/><rect x="67" y="164" width="10" height="10"/><rect x="130" y="226" width="10" height="10"/></g>
+  <g stroke="#2868c5" stroke-width="1.5" opacity=".95"><circle cx="17" cy="74" r="6"/><circle cx="79" cy="79" r="6"/><circle cx="28" cy="142" r="6"/><circle cx="145" cy="56" r="6"/><circle cx="88" cy="229" r="6"/><circle cx="23" cy="218" r="6"/><circle cx="44" cy="262" r="6"/><circle cx="118" cy="310" r="6"/></g>
+</svg>

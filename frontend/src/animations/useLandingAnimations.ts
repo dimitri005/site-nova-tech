@@ -18,7 +18,7 @@ export function useLandingAnimations(scope: RefObject<HTMLElement | null>) {
         .from('.hero-copy > .button', { autoAlpha: 0, y: 14, duration: 0.45 }, '-=0.25')
 
       gsap.utils.toArray<HTMLElement>(
-        '.feature-item, .about-visual, .about-copy, .service-card, .project-card, .stat, .mission-card, .news-card',
+        '.feature-item, .about-visual, .about-copy, .service-card, .project-card, .stat, .mission-card, .mission-stat, .mission-benefit, .news-card, .news-promo, .why-visual, .why-copy, .contact-form, .vision-portrait, .vision-copy, .video-row, .success-copy, .footer-grid > *',
       ).forEach((element) => {
         gsap.fromTo(
           element,

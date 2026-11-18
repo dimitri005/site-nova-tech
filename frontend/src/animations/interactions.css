@@ -1,0 +1,129 @@
+:root {
+  --nova-motion-ease: cubic-bezier(.22, .68, 0, 1.04);
+  --nova-motion-blue: #3267ed;
+}
+
+:is(a, button, input, select, textarea) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:is(a, button):focus-visible,
+:is(input, select, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--nova-motion-blue) 58%, transparent);
+  outline-offset: 3px;
+}
+
+:is(.public-card, .feature-item, .service-card, .project-card, .news-card, .news-promo, .mission-card, .mission-stat, .mission-benefit, .admin-stat-card) {
+  transition: transform 280ms var(--nova-motion-ease), box-shadow 280ms ease, border-color 240ms ease, background-color 280ms ease;
+  transform: translateZ(0);
+}
+
+:is(.public-card, .feature-item, .project-card, .news-card, .news-promo, .mission-card, .mission-stat, .mission-benefit, .admin-stat-card):hover {
+  transform: translateY(-5px);
+  border-color: color-mix(in srgb, var(--nova-motion-blue) 55%, #dfe5f0);
+  box-shadow: 0 18px 38px rgba(18, 36, 79, .13);
+}
+
+.service-card:hover { transform: translateY(-4px); }
+
+:is(.public-card-image, .team-photo, .project-image, .news-image, .why-photo-one, .why-photo-two, .vision-portrait) {
+  overflow: hidden;
+}
+
+:is(.public-card, .team-card, .project-card, .news-card, .news-promo, .about-visual, .why-visual, .vision-portrait, .mission-benefit):hover img {
+  transform: scale(1.035);
+  filter: brightness(1.025) saturate(1.035);
+}
+
+:is(.public-card-image, .team-photo, .project-image, .news-image)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(145deg, rgba(50, 103, 237, .15), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
+
+:is(.public-card, .team-card, .project-card, .news-card, .news-promo):hover :is(.public-card-image, .team-photo, .project-image, .news-image)::after {
+  opacity: 1;
+}
+
+:is(.public-card-image, .team-photo, .project-image, .news-image) img {
+  transition: transform 550ms var(--nova-motion-ease), filter 400ms ease;
+}
+
+:is(.public-card, .service-card, .project-card, .news-card, .news-promo) .card-link b,
+:is(.public-card, .service-card, .project-card, .news-card, .news-promo) .card-link span {
+  display: inline-block;
+  transition: transform 220ms var(--nova-motion-ease);
+}
+
+:is(.public-card, .service-card, .project-card, .news-card, .news-promo):hover .card-link b,
+:is(.public-card, .service-card, .project-card, .news-card, .news-promo):hover .card-link span {
+  transform: translateX(4px);
+}
+
+.public-site a,
+.admin-shell a {
+  transition: color 200ms ease, text-decoration-color 200ms ease;
+}
+
+.public-site a:hover,
+.admin-shell a:hover {
+  text-decoration-color: currentColor;
+}
+
+:is(.service-icon, .card-icon, .admin-stat-card > span, .mission-stat > span, .feature-icon) {
+  animation: nova-gentle-float 5s ease-in-out infinite;
+}
+
+:is(.service-card, .public-card, .mission-stat, .admin-stat-card):nth-child(2n) :is(.service-icon, .card-icon, .admin-stat-card > span, .mission-stat > span, .feature-icon) {
+  animation-delay: -2.4s;
+}
+
+.inner-hero {
+  isolation: isolate;
+}
+
+.inner-hero::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 300px;
+  height: 300px;
+  right: max(-125px, calc((100vw - 1200px) / 2));
+  top: -155px;
+  border: 1px solid rgba(50, 103, 237, .08);
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px rgba(50, 103, 237, .025), 0 0 0 46px rgba(50, 103, 237, .02), 0 0 0 78px rgba(50, 103, 237, .015);
+  pointer-events: none;
+  animation: nova-drift 12s ease-in-out infinite alternate;
+}
+
+@keyframes nova-gentle-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes nova-drift {
+  from { transform: translate3d(0, 0, 0) rotate(-4deg); }
+  to { transform: translate3d(-12px, 9px, 0) rotate(4deg); }
+}
+
+@media (max-width: 720px) {
+  .inner-hero::after { width: 210px; height: 210px; right: -110px; top: -100px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  :is(.public-card, .feature-item, .service-card, .project-card, .news-card, .news-promo, .mission-card, .mission-stat, .mission-benefit, .admin-stat-card):hover {
+    transform: none;
+  }
+}

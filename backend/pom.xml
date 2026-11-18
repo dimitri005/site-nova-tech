@@ -11,8 +11,8 @@
 	<groupId>NTS</groupId>
 	<artifactId>NTS</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>nova-tech-solution-backend</name>
+	<description>Backend modulaire du site vitrine NovaTech Solution</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -26,9 +26,12 @@
 		<tag/>
 		<url/>
 	</scm>
-	<properties>
-		<java.version>21</java.version>
-	</properties>
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+    </properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -37,6 +40,40 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jackson</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.2.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.24.1</version>
 		</dependency>
 
 		<dependency>
@@ -76,6 +113,9 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<release>21</release>
+				</configuration>
 				<executions>
 					<execution>
 						<id>default-compile</id>
@@ -84,6 +124,10 @@
 							<goal>compile</goal>
 						</goals>
 						<configuration>
+							<excludes>
+								<!-- Legacy DUDEN sample code is kept as a style reference, not part of NovaTech. -->
+								<exclude>com/novatechsolution/student/**/*.java</exclude>
+							</excludes>
 							<annotationProcessorPaths>
 								<path>
 									<groupId>org.projectlombok</groupId>
@@ -99,6 +143,9 @@
 							<goal>testCompile</goal>
 						</goals>
 						<configuration>
+							<excludes>
+								<exclude>com/novatechsolution/student/**/*.java</exclude>
+							</excludes>
 							<annotationProcessorPaths>
 								<path>
 									<groupId>org.projectlombok</groupId>

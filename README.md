@@ -30,7 +30,7 @@ npm run build
 
 ## Backend
 
-Le dossier `backend` contient le squelette Spring Boot et sa configuration PostgreSQL. La configuration utilise les variables `DB_URL`, `DB_USERNAME` et `DB_PASSWORD`.
+Le dossier `backend` contient l'API REST Spring Boot/PostgreSQL pour les contenus, formations, pré-inscriptions, demandes, médias et administration. La configuration utilise les variables `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` et `JWT_SECRET_BASE64`. Les instructions détaillées sont dans [backend/README.md](backend/README.md).
 
 Exemple PowerShell avant de lancer le backend :
 
@@ -42,7 +42,7 @@ cd backend
 ./mvnw.cmd spring-boot:run
 ```
 
-La base PostgreSQL doit exister et être accessible. Aucune API métier ne relie encore le frontend à ce backend.
+La base PostgreSQL doit exister et être accessible. Les formulaires et l'administration du frontend restent en mode démonstration et ne sont pas encore reliés à l'API.
 
 ## Routes principales
 
