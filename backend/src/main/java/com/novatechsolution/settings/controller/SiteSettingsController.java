@@ -1,6 +1,7 @@
 package com.novatechsolution.settings.controller;
 
 import com.novatechsolution.settings.dto.SiteSettingsRequest;
+import com.novatechsolution.settings.dto.HomepageSettingsRequest;
 import com.novatechsolution.settings.service.SiteSettingsService;
 import com.novatechsolution.shared.web.ApiResponse;
 import jakarta.validation.Valid;
@@ -15,6 +16,10 @@ public class SiteSettingsController {
     @GetMapping("/api/v1/settings/public") public ApiResponse<Map<String, String>> publicValues() { return ApiResponse.of(service.publicValues()); }
     @GetMapping("/api/v1/admin/settings") @PreAuthorize("hasAnyRole('SUPER_ADMIN','EDITOR')")
     public ApiResponse<Map<String, String>> adminValues() { return ApiResponse.of(service.adminValues()); }
+    @GetMapping("/api/v1/admin/homepage") @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<Map<String, String>> homepageValues() { return ApiResponse.of(service.homepageValues()); }
+    @PutMapping("/api/v1/admin/homepage") @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<Map<String, String>> saveHomepage(@Valid @RequestBody HomepageSettingsRequest request) { return ApiResponse.of(service.replaceHomepage(request)); }
     @PutMapping("/api/v1/admin/settings") @PreAuthorize("hasAnyRole('SUPER_ADMIN','EDITOR')")
     public ApiResponse<Map<String, String>> replace(@Valid @RequestBody SiteSettingsRequest request) { return ApiResponse.of(service.replace(request)); }
 }

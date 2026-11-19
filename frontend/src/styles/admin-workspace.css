@@ -124,3 +124,12 @@
   .admin-stat-card,
   .quick-action-card { transition: none; }
 }
+
+.homepage-editor { display: grid; gap: 22px; padding: 24px; }
+.homepage-editor-group { padding-bottom: 20px; border-bottom: 1px solid #e7ebf3; }
+.homepage-editor-group h2 { margin: 0 0 16px; font-size: 18px; }
+.homepage-editor-group .form-two-columns { gap: 14px 20px; }
+.homepage-editor-group label { align-content: start; }
+.homepage-image-preview { display: block; width: min(100%, 360px); max-height: 180px; margin-top: 8px; object-fit: cover; border: 1px solid #e1e7f1; border-radius: 8px; }
+.admin-image-upload { display: grid; gap: 6px; margin-top: 6px; }
+.admin-image-upload small { color: #64748b; font-size: 12px; }

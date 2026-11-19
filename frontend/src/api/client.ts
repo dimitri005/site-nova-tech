@@ -30,7 +30,7 @@ export class ApiError extends Error {
 const ACCESS_TOKEN_KEY = 'nova-api-access'
 const REFRESH_TOKEN_KEY = 'nova-api-refresh'
 const SESSION_KEY = 'nova-api-user'
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '')
+const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/v1').replace(/\/$/, '')
 let refreshInFlight: Promise<AdminSession | null> | null = null
 
 function readJson<T>(value: string | null, fallback: T): T {

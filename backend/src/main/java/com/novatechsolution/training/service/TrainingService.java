@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.List;
 import java.util.UUID;
 
@@ -80,7 +81,8 @@ public class TrainingService {
         c.setDescriptionFr(r.descriptionFr().trim()); c.setDescriptionEn(r.descriptionEn().trim());
         c.setObjectivesFr(r.objectivesFr()); c.setObjectivesEn(r.objectivesEn()); c.setAudienceFr(r.audienceFr()); c.setAudienceEn(r.audienceEn());
         c.setPrerequisitesFr(r.prerequisitesFr()); c.setPrerequisitesEn(r.prerequisitesEn()); c.setProgramFr(r.programFr()); c.setProgramEn(r.programEn());
-        c.setDurationHours(r.durationHours()); c.setIndicativePrice(r.indicativePrice()); c.setCurrency(r.currency() == null ? "XAF" : r.currency().toUpperCase());
+        c.setDurationHours(r.durationHours()); c.setIndicativePrice(r.indicativePrice());
+        c.setCurrency(r.currency() == null || r.currency().isBlank() ? "XAF" : r.currency().trim().toUpperCase(Locale.ROOT));
         c.setImageUrl(r.imageUrl()); c.setPublished(r.published());
     }
     private void apply(TrainingSession s, TrainingSessionRequest r) {

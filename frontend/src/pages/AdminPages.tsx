@@ -6,13 +6,14 @@ import logo from '../assets/nova-tech-logo.png'
 import logoLight from '../assets/nova-tech-logo-light.png'
 import { ApiError, apiDownload, apiMediaUrl, apiSend, getStoredSession, isAuthenticated, login, logout } from '../api/client'
 import { ApiState } from '../api/ApiState'
+import { homepageDefaults, homepageFieldGroups } from '../data/homepageContent'
 import { useApiData } from '../api/hooks'
 import type { ActivityRecord, AdminUserRecord, ContactRecord, DashboardRecord, MediaRecord, NewsletterRecord, QuoteRecord, TrainingEnrollmentRecord, TrainingRecord, TrainingSessionRecord } from '../api/types'
 import '../styles/site-pages.css'
 import '../styles/admin-auth.css'
 import '../styles/admin-workspace.css'
 
-type Field = { name: string; label: string; type?: 'text' | 'textarea' | 'number' | 'date' | 'datetime-local' | 'url' | 'email' | 'checkbox' | 'select' | 'list'; required?: boolean; options?: { value: string; label: string }[] }
+type Field = { name: string; label: string; type?: 'text' | 'textarea' | 'number' | 'date' | 'datetime-local' | 'url' | 'email' | 'checkbox' | 'select' | 'list' | 'image'; required?: boolean; options?: { value: string; label: string }[] }
 type Row = Record<string, unknown> & { id?: string; slug?: string }
 type Resource = { key: string; label: string; path: string; fields: Field[]; keyField?: 'id' | 'slug'; superAdminDelete?: boolean }
 
@@ -21,14 +22,14 @@ const resources: Resource[] = [
     { name: 'slug', label: 'Slug', required: true }, { name: 'category', label: 'Catégorie', required: true },
     { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
     { name: 'descriptionFr', label: 'Description (FR)', type: 'textarea', required: true }, { name: 'descriptionEn', label: 'Description (EN)', type: 'textarea', required: true },
-    { name: 'imageUrl', label: 'URL de l’image', type: 'url' }, { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+    { name: 'imageUrl', label: 'URL de l’image', type: 'image' }, { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
   ] },
   { key: 'projects', label: 'Réalisations', path: '/admin/projects', fields: [
     { name: 'slug', label: 'Slug', required: true }, { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
     { name: 'descriptionFr', label: 'Description (FR)', type: 'textarea', required: true }, { name: 'descriptionEn', label: 'Description (EN)', type: 'textarea', required: true },
     { name: 'category', label: 'Catégorie', required: true }, { name: 'clientName', label: 'Client' },
     { name: 'technologies', label: 'Technologies (une par ligne)', type: 'list' }, { name: 'galleryUrls', label: 'Galerie d’images (une URL par ligne)', type: 'list' },
-    { name: 'coverImageUrl', label: 'Image principale', type: 'url' }, { name: 'projectDate', label: 'Date du projet', type: 'date' }, { name: 'projectUrl', label: 'Lien du projet', type: 'url' },
+    { name: 'coverImageUrl', label: 'Image principale', type: 'image' }, { name: 'projectDate', label: 'Date du projet', type: 'date' }, { name: 'projectUrl', label: 'Lien du projet', type: 'url' },
     { name: 'featured', label: 'Mettre en avant', type: 'checkbox' }, { name: 'published', label: 'Publié', type: 'checkbox' },
   ] },
   { key: 'trainings', label: 'Formations', path: '/admin/trainings', superAdminDelete: true, fields: [
@@ -39,13 +40,13 @@ const resources: Resource[] = [
     { name: 'prerequisitesFr', label: 'Prérequis (FR)', type: 'textarea' }, { name: 'prerequisitesEn', label: 'Prerequisites (EN)', type: 'textarea' },
     { name: 'programFr', label: 'Programme (FR)', type: 'textarea' }, { name: 'programEn', label: 'Program (EN)', type: 'textarea' },
     { name: 'durationHours', label: 'Durée (heures)', type: 'number' }, { name: 'indicativePrice', label: 'Tarif indicatif', type: 'number' },
-    { name: 'currency', label: 'Devise' }, { name: 'imageUrl', label: 'Image', type: 'url' }, { name: 'published', label: 'Publié', type: 'checkbox' },
+    { name: 'currency', label: 'Devise' }, { name: 'imageUrl', label: 'Image', type: 'image' }, { name: 'published', label: 'Publié', type: 'checkbox' },
   ] },
   { key: 'team', label: 'Équipe', path: '/admin/team', fields: [
     { name: 'slug', label: 'Slug', required: true }, { name: 'fullName', label: 'Nom complet', required: true },
     { name: 'positionFr', label: 'Poste (FR)', required: true }, { name: 'positionEn', label: 'Position (EN)', required: true },
     { name: 'biographyFr', label: 'Biographie (FR)', type: 'textarea', required: true }, { name: 'biographyEn', label: 'Biography (EN)', type: 'textarea', required: true },
-    { name: 'photoUrl', label: 'Photo', type: 'url' }, { name: 'email', label: 'E-mail', type: 'email' },
+    { name: 'photoUrl', label: 'Photo', type: 'image' }, { name: 'email', label: 'E-mail', type: 'email' },
     { name: 'linkedInUrl', label: 'LinkedIn', type: 'url' }, { name: 'facebookUrl', label: 'Facebook', type: 'url' },
     { name: 'category', label: 'Catégorie', type: 'select', required: true, options: [{ value: 'FOUNDER', label: 'Fondateur' }, { value: 'STAFF', label: 'Personnel' }] },
     { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
@@ -57,14 +58,14 @@ const resources: Resource[] = [
     { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
   ] },
   { key: 'partners', label: 'Partenaires', path: '/admin/partners', fields: [
-    { name: 'name', label: 'Nom', required: true }, { name: 'logoUrl', label: 'Logo', type: 'url', required: true },
+    { name: 'name', label: 'Nom', required: true }, { name: 'logoUrl', label: 'Logo', type: 'image', required: true },
     { name: 'websiteUrl', label: 'Site web', type: 'url' }, { name: 'displayOrder', label: 'Ordre', type: 'number' }, { name: 'published', label: 'Publié', type: 'checkbox' },
   ] },
   { key: 'articles', label: 'Articles', path: '/admin/articles', fields: [
     { name: 'slug', label: 'Slug', required: true }, { name: 'titleFr', label: 'Titre (FR)', required: true }, { name: 'titleEn', label: 'Title (EN)', required: true },
     { name: 'excerptFr', label: 'Résumé (FR)', type: 'textarea', required: true }, { name: 'excerptEn', label: 'Excerpt (EN)', type: 'textarea', required: true },
     { name: 'bodyFr', label: 'Contenu HTML (FR)', type: 'textarea', required: true }, { name: 'bodyEn', label: 'HTML content (EN)', type: 'textarea', required: true },
-    { name: 'category', label: 'Catégorie', required: true }, { name: 'coverImageUrl', label: 'Image de couverture', type: 'url' },
+    { name: 'category', label: 'Catégorie', required: true }, { name: 'coverImageUrl', label: 'Image de couverture', type: 'image' },
     { name: 'seoTitleFr', label: 'Titre SEO (FR)' }, { name: 'seoTitleEn', label: 'SEO title (EN)' },
     { name: 'seoDescriptionFr', label: 'Description SEO (FR)', type: 'textarea' }, { name: 'seoDescriptionEn', label: 'SEO description (EN)', type: 'textarea' },
     { name: 'status', label: 'Publication', type: 'select', required: true, options: [{ value: 'DRAFT', label: 'Brouillon' }, { value: 'PUBLISHED', label: 'Publié' }] },
@@ -159,8 +160,9 @@ function AdminLayout() {
   if (!isAuthenticated()) return <Navigate to="/admin/login" state={{ from: location }} replace/>
   const session = getStoredSession()
   const superAdmin = session?.roles.includes('SUPER_ADMIN') ?? false
+  const canEditHomepage = superAdmin || (session?.roles.includes('EDITOR') ?? false)
   const doLogout = async () => { await logout(); navigate('/admin/login', { replace: true }) }
-  return <div className={`admin-shell${collapsed ? ' sidebar-collapsed' : ''}`} ref={pageScope}><aside className="admin-sidebar"><Link to="/admin" className="admin-logo"><img src={logo} alt="NOVA-TECH-SOLUTION"/></Link><p className="admin-nav-label">ESPACE ADMIN</p><NavLink end to="/admin" className="admin-nav-link">Tableau de bord</NavLink><p className="admin-nav-label">CONTENUS</p>{resources.map((item) => <NavLink key={item.key} to={`/admin/content/${item.key}`} className="admin-nav-link">{item.label}</NavLink>)}<NavLink to="/admin/sessions" className="admin-nav-link">Sessions</NavLink><NavLink to="/admin/media" className="admin-nav-link">Médiathèque</NavLink><p className="admin-nav-label">DEMANDES</p>{requestLinks.map((item) => <NavLink key={item.key} to={`/admin/requests/${item.key}`} className="admin-nav-link">{item.label}</NavLink>)}<NavLink to="/admin/newsletter" className="admin-nav-link">Newsletter</NavLink><NavLink to="/admin/settings" className="admin-nav-link">Paramètres</NavLink>{superAdmin && <NavLink to="/admin/activity" className="admin-nav-link">Journal d&#39;activit&#233;</NavLink>}{superAdmin && <NavLink to="/admin/users" className="admin-nav-link">Utilisateurs</NavLink>}<button className="admin-logout" onClick={() => void doLogout()}>Déconnexion</button></aside><div className="admin-main"><header className="admin-topbar"><button className="sidebar-toggle" onClick={() => setCollapsed((value) => !value)} aria-label="Réduire le menu">☰</button><div><span className="admin-user"><i>{session?.displayName?.slice(0, 2).toUpperCase() || 'NT'}</i>{session?.displayName || session?.email}</span></div></header><div className="admin-content"><Outlet/></div></div></div>
+  return <div className={`admin-shell${collapsed ? ' sidebar-collapsed' : ''}`} ref={pageScope}><aside className="admin-sidebar"><Link to="/admin" className="admin-logo"><img src={logo} alt="NOVA-TECH-SOLUTION"/></Link><p className="admin-nav-label">ESPACE ADMIN</p><NavLink end to="/admin" className="admin-nav-link">Tableau de bord</NavLink>{canEditHomepage && <NavLink to="/admin/homepage" className="admin-nav-link">Accueil du site</NavLink>}<p className="admin-nav-label">CONTENUS</p>{resources.map((item) => <NavLink key={item.key} to={`/admin/content/${item.key}`} className="admin-nav-link">{item.label}</NavLink>)}<NavLink to="/admin/sessions" className="admin-nav-link">Sessions</NavLink><NavLink to="/admin/media" className="admin-nav-link">Médiathèque</NavLink><p className="admin-nav-label">DEMANDES</p>{requestLinks.map((item) => <NavLink key={item.key} to={`/admin/requests/${item.key}`} className="admin-nav-link">{item.label}</NavLink>)}<NavLink to="/admin/newsletter" className="admin-nav-link">Newsletter</NavLink><NavLink to="/admin/settings" className="admin-nav-link">Paramètres</NavLink>{superAdmin && <NavLink to="/admin/activity" className="admin-nav-link">Journal d&#39;activit&#233;</NavLink>}{superAdmin && <NavLink to="/admin/users" className="admin-nav-link">Utilisateurs</NavLink>}<button className="admin-logout" onClick={() => void doLogout()}>Déconnexion</button></aside><div className="admin-main"><header className="admin-topbar"><button className="sidebar-toggle" onClick={() => setCollapsed((value) => !value)} aria-label="Réduire le menu">☰</button><div><span className="admin-user"><i>{session?.displayName?.slice(0, 2).toUpperCase() || 'NT'}</i>{session?.displayName || session?.email}</span></div></header><div className="admin-content"><Outlet/></div></div></div>
 }
 
 function DashboardIcon({ name }: { name: string }) {
@@ -208,6 +210,14 @@ function AdminDashboard() {
     </section>
   </>
 }
+async function uploadAdminImage(file: File, altFr = '', altEn = ''): Promise<MediaRecord> {
+  const body = new FormData()
+  body.append('file', file)
+  body.append('altFr', altFr)
+  body.append('altEn', altEn)
+  return apiSend<MediaRecord>('/admin/media', 'POST', body)
+}
+
 function fieldValue(field: Field, value: unknown): string {
   if (field.type === 'checkbox') return value ? 'true' : ''
   if (field.type === 'list') return Array.isArray(value) ? value.join('\n') : String(value ?? '')
@@ -231,13 +241,22 @@ function fieldsToBody(form: HTMLFormElement, fields: Field[]): Row {
 function EditorForm({ fields, initial, title, onCancel, onSave }: { fields: Field[]; initial?: Row | null; title: string; onCancel: () => void; onSave: (body: Row) => Promise<void> }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [imageValues, setImageValues] = useState<Record<string, string>>({})
+  const [uploadingField, setUploadingField] = useState('')
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(''); setBusy(true)
-    try { await onSave(fieldsToBody(event.currentTarget, fields)) }
-    catch (reason) { setError(reason instanceof ApiError ? `${reason.message}${Object.values(reason.fields).length ? ` — ${Object.values(reason.fields).join(' ')}` : ''}` : 'Enregistrement impossible.') }
+    try { await onSave({ ...fieldsToBody(event.currentTarget, fields), ...imageValues }) }
+    catch (reason) { setError(reason instanceof ApiError ? `${reason.message}${Object.values(reason.fields).length ? ` ? ${Object.values(reason.fields).join(' ')}` : ''}` : 'Enregistrement impossible.') }
     finally { setBusy(false) }
   }
-  return <form className="admin-edit-form" onSubmit={submit}><h2>{title}</h2><div className="form-two-columns">{fields.map((field) => <label key={field.name} className={field.type === 'checkbox' ? 'admin-checkbox-field' : ''}>{field.type === 'checkbox' ? <><input type="checkbox" name={field.name} defaultChecked={Boolean(initial?.[field.name])}/>{field.label}</> : <>{field.label}{field.type === 'textarea' || field.type === 'list' ? <textarea name={field.name} rows={field.type === 'list' ? 3 : 4} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}/> : field.type === 'select' ? <select name={field.name} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}><option value="">Choisir…</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input name={field.name} type={field.type || 'text'} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} step={field.type === 'number' ? 'any' : undefined}/>}</>}</label>)}</div><ErrorMessage value={error}/><div className="edit-form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Annuler</button><button className="primary-action" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer'}</button></div></form>
+  const upload = async (field: Field, file?: File) => {
+    if (!file) return
+    setError(''); setUploadingField(field.name)
+    try { const asset = await uploadAdminImage(file); setImageValues((current) => ({ ...current, [field.name]: asset.url })) }
+    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Televersement impossible.') }
+    finally { setUploadingField('') }
+  }
+  return <form className="admin-edit-form" onSubmit={submit}><h2>{title}</h2><div className="form-two-columns">{fields.map((field) => <label key={field.name} className={field.type === 'checkbox' ? 'admin-checkbox-field' : ''}>{field.type === 'checkbox' ? <><input type="checkbox" name={field.name} defaultChecked={Boolean(initial?.[field.name])}/>{field.label}</> : <>{field.label}{field.type === 'image' ? <><input name={field.name} type="text" placeholder="https://... ou /media/..." value={imageValues[field.name] ?? fieldValue(field, initial?.[field.name])} onChange={(event) => setImageValues((current) => ({ ...current, [field.name]: event.target.value }))}/><span className="admin-image-upload"><input type="file" accept="image/jpeg,image/png" aria-label={`Televerser ${field.label}`} disabled={uploadingField === field.name} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void upload(field, file).finally(() => { input.value = '' }) }}/>{uploadingField === field.name && <small>Televersement...</small>}{imageValues[field.name] && <small>Image televersee : {imageValues[field.name]}</small>}</span></> : field.type === 'textarea' || field.type === 'list' ? <textarea name={field.name} rows={field.type === 'list' ? 3 : 4} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}/> : field.type === 'select' ? <select name={field.name} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}><option value="">Choisir...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input name={field.name} type={field.type || 'text'} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} step={field.type === 'number' ? 'any' : undefined}/>}</>}</label>)}</div><ErrorMessage value={error}/><div className="edit-form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Annuler</button><button className="primary-action" type="submit" disabled={busy || Boolean(uploadingField)}>{busy ? 'Enregistrement...' : 'Enregistrer'}</button></div></form>
 }
 
 function ContentManager() {
@@ -370,6 +389,33 @@ function MediaManager() {
   return <><div className="admin-page-heading"><div><p className="eyebrow">GESTION DES MÉDIAS <i/></p><h1>Médiathèque</h1><p>Images JPEG ou PNG, 10 Mo maximum. Elles sont conservées sur le serveur.</p></div></div><form className="admin-edit-form" onSubmit={(event) => void upload(event)}><label>Fichier image<input type="file" name="file" accept="image/jpeg,image/png" required/></label><div className="form-two-columns"><label>Texte alternatif (FR)<input name="altFr" maxLength={300}/></label><label>Alt text (EN)<input name="altEn" maxLength={300}/></label></div><button className="primary-action" disabled={busy}>{busy ? 'Envoi…' : 'Téléverser'}</button><ErrorMessage value={message}/></form><ApiState loading={loading} error={error} onRetry={reload}/><div className="media-grid">{(data || []).map((item) => <article className="media-item" key={item.id}><img src={apiMediaUrl(item.url)} alt={item.altFr || item.originalName}/><div><strong>{item.originalName}</strong><small>{(item.fileSize / 1024).toFixed(0)} Ko</small><small>{apiMediaUrl(item.url)}</small></div><button className="danger-action" onClick={() => void remove(item)}>Supprimer</button></article>)}</div></>
 }
 
+function HomepageManager() {
+  const { data, loading, error, reload } = useApiData<Record<string, string>>('/admin/homepage')
+  if (!data) return <><div className="admin-page-heading"><div><p className="eyebrow">CONTENU DU SITE <i/></p><h1>Page d'accueil</h1><p>Modifiez les textes et visuels. Les cartes de services, projets, formations et actualites sont gerees dans leurs rubriques.</p></div></div><ApiState loading={loading} error={error} onRetry={reload}/></>
+  return <HomepageEditor initialValues={{ ...homepageDefaults, ...data }}/>
+}
+
+function HomepageEditor({ initialValues }: { initialValues: Record<string, string> }) {
+  const [values, setValues] = useState(initialValues)
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [uploadingField, setUploadingField] = useState('')
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setBusy(true); setMessage('')
+    try { await apiSend('/admin/homepage', 'PUT', { values }); setMessage('Contenu de la page d?accueil enregistre.') }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Enregistrement impossible.') }
+    finally { setBusy(false) }
+  }
+  const upload = async (key: string, file?: File) => {
+    if (!file) return
+    setUploadingField(key); setMessage('')
+    try { const asset = await uploadAdminImage(file); setValues((current) => ({ ...current, [`home.${key}`]: asset.url })); setMessage('Image televersee. Enregistrez la page pour publier la modification.') }
+    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Televersement impossible.') }
+    finally { setUploadingField('') }
+  }
+  return <><div className="admin-page-heading"><div><p className="eyebrow">CONTENU DU SITE <i/></p><h1>Page d'accueil</h1><p>Les textes sont bilingues. Les apercus de services, projets, formations et actualites utilisent les contenus publies dans leurs rubriques.</p></div><a className="secondary-action" href="/fr" target="_blank" rel="noreferrer">Voir le site</a></div><form className="admin-panel homepage-editor" onSubmit={(event) => void submit(event)}>{homepageFieldGroups.map((group) => <section className="homepage-editor-group" key={group.title}><h2>{group.title}</h2><div className="form-two-columns">{group.fields.map((field) => { const key = `home.${field.key}`; return <label key={field.key}>{field.label}{field.kind === 'textarea' ? <textarea rows={3} maxLength={4000} value={values[key] || ''} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}/> : <input type="text" maxLength={4000} placeholder={field.kind === 'image' ? 'https://... ou /media/...' : ''} value={values[key] || ''} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}/>}{field.kind === 'image' && <><input type="file" accept="image/jpeg,image/png" aria-label={`Televerser ${field.label}`} disabled={uploadingField === field.key} onChange={(event) => { const file = event.currentTarget.files?.[0]; void upload(field.key, file).finally(() => { event.currentTarget.value = '' }) }}/>{values[key] && <img className="homepage-image-preview" src={values[key].startsWith('/media/') ? apiMediaUrl(values[key]) : values[key]} alt={field.label}/>}</>}</label> })}</div></section>)}<ErrorMessage value={message}/><button className="primary-action" disabled={busy || Boolean(uploadingField)}>{busy ? 'Enregistrement...' : 'Enregistrer la page d?accueil'}</button></form></>
+}
+
 function SiteSettingsManager() {
   const { data, loading, error, reload } = useApiData<Record<string, string>>('/admin/settings')
   if (!data) {
@@ -471,6 +517,13 @@ function Guarded({ children }: { children: ReactNode }) {
   return isAuthenticated() ? children : <Navigate to="/admin/login" state={{ from: location }} replace/>
 }
 
+function HomepageEditorGuard() {
+  const location = useLocation()
+  const session = getStoredSession()
+  if (!isAuthenticated()) return <Navigate to="/admin/login" state={{ from: location }} replace/>
+  return session?.roles.some((role) => role === 'SUPER_ADMIN' || role === 'EDITOR') ? <Outlet/> : <Navigate to="/admin" replace/>
+}
+
 function SuperAdminGuard() {
   const location = useLocation()
   const session = getStoredSession()
@@ -485,6 +538,7 @@ export function AdminRoutes() {
       <Route index element={<AdminDashboard/>}/><Route path="content/:resource" element={<ContentManager/>}/><Route path="sessions" element={<TrainingSessionManager/>}/>
       <Route path="requests/:requestType" element={<RequestManager/>}/><Route path="media" element={<MediaManager/>}/><Route path="settings" element={<SiteSettingsManager/>}/>
       <Route path="newsletter" element={<NewsletterManager/>}/>
+      <Route element={<HomepageEditorGuard/>}><Route path="homepage" element={<HomepageManager/>}/></Route>
       <Route element={<SuperAdminGuard/>}><Route path="activity" element={<ActivityManager/>}/><Route path="users" element={<UserManager/>}/><Route path="users/new" element={<CreateAdminAccount/>}/></Route>
       <Route path="*" element={<Navigate to="/admin" replace/>}/>
     </Route>
