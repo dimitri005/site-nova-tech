@@ -98,8 +98,6 @@ function AdminLogin() {
   const location = useLocation()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [forgot, setForgot] = useState(false)
-  const [notice, setNotice] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setBusy(true); setError('')
@@ -109,13 +107,6 @@ function AdminLogin() {
       const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
       navigate(from && from.startsWith('/admin') ? from : '/admin', { replace: true })
     } catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Connexion impossible. Vérifiez que le serveur est lancé.') }
-    finally { setBusy(false) }
-  }
-  const requestReset = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('')
-    const email = String(new FormData(event.currentTarget).get('email'))
-    try { await apiSend('/auth/password/forgot', 'POST', { email }); setNotice('Si ce compte existe, un lien de réinitialisation a été envoyé.') }
-    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Impossible de contacter le serveur.') }
     finally { setBusy(false) }
   }
   if (isAuthenticated()) return <Navigate to="/admin" replace/>
@@ -139,44 +130,23 @@ function AdminLogin() {
         <div className="admin-login-content">
           <img className="admin-login-logo" src={logo} alt="NovaTech Solution — On code votre réussite"/>
           <div className="admin-login-emblem" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10M6.5 10h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5v-7A1.5 1.5 0 0 1 6.5 10Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M12 14v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg></div>
-          <div className="admin-login-title"><p className="admin-login-kicker">ACCÈS SÉCURISÉ</p><h1>{forgot ? 'Mot de passe oublié ?' : 'Connexion'}</h1><p>{forgot ? 'Recevez un lien sécurisé pour choisir un nouveau mot de passe.' : 'Entrez vos identifiants pour accéder à votre espace.'}</p></div>
-          {forgot ? <form className="admin-auth-form" onSubmit={requestReset}>
-            <label htmlFor="admin-reset-email">Adresse e-mail</label>
-            <div className="admin-auth-input"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg><input id="admin-reset-email" name="email" type="email" autoComplete="email" placeholder="nom@exemple.com" required/></div>
-            <ErrorMessage value={error}/>{notice && <p className="admin-auth-success" role="status">{notice}</p>}
-            <button className="admin-auth-submit" type="submit" disabled={busy}>{busy ? 'Envoi en cours…' : 'Envoyer le lien'}<span aria-hidden="true">→</span></button>
-            <button type="button" className="admin-auth-back" onClick={() => { setForgot(false); setError(''); setNotice('') }}>Retour à la connexion</button>
-          </form> : <form className="admin-auth-form" onSubmit={submit}>
+          <div className="admin-login-title"><p className="admin-login-kicker">ACC?S S?CURIS?</p><h1>Connexion</h1><p>Entrez vos identifiants pour acc?der ? votre espace.</p></div>
+          <form className="admin-auth-form" onSubmit={submit}>
             <label htmlFor="admin-login-email">Adresse e-mail</label>
             <div className="admin-auth-input"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg><input id="admin-login-email" name="email" type="email" autoComplete="username" placeholder="nom@exemple.com" required/></div>
-            <div className="admin-auth-password-label"><label htmlFor="admin-login-password">Mot de passe</label><button type="button" onClick={() => setForgot(true)}>Mot de passe oublié ?</button></div>
+            <div className="admin-auth-password-label"><label htmlFor="admin-login-password">Mot de passe</label></div>
             <div className="admin-auth-input"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="M8 10V7a4 4 0 1 1 8 0v3m-4 5v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg><input id="admin-login-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Votre mot de passe" required/><button className="admin-auth-reveal" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}>{showPassword ? 'Masquer' : 'Afficher'}</button></div>
             <ErrorMessage value={error}/>
-            <button className="admin-auth-submit" type="submit" disabled={busy}>{busy ? 'Connexion en cours…' : 'Se connecter'}<span aria-hidden="true">→</span></button>
-            <p className="admin-auth-account-note">La création des comptes est réservée au super administrateur.</p>
-          </form>}
+            <button className="admin-auth-submit" type="submit" disabled={busy}>{busy ? 'Connexion en cours?' : 'Se connecter'}<span aria-hidden="true">?</span></button>
+            <p className="admin-auth-account-note">Mot de passe oubli? ? Demandez au super administrateur de le r?initialiser dans la gestion des comptes.</p>
+            <p className="admin-auth-account-note">La cr?ation des comptes est r?serv?e au super administrateur.</p>
+          </form>
           <div className="admin-login-footer"><span className="admin-login-shield" aria-hidden="true">✓</span><span>Connexion sécurisée · Données protégées</span></div>
           <Link className="admin-login-back-site" to="/fr">← Retour au site</Link>
         </div>
       </section>
     </div>
   </main>
-}
-
-function ResetPassword() {
-  const navigate = useNavigate()
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const token = new URLSearchParams(window.location.search).get('token') || ''
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setBusy(true); setError('')
-    const password = String(new FormData(event.currentTarget).get('password'))
-    try { await apiSend('/auth/password/reset', 'POST', { token, newPassword: password }); setDone(true); window.setTimeout(() => navigate('/admin/login'), 1800) }
-    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Réinitialisation impossible.') }
-    finally { setBusy(false) }
-  }
-  return <main className="admin-login-page"><div className="admin-login-card"><h1>Nouveau mot de passe</h1>{done ? <p className="form-success" role="status">Mot de passe modifié. Redirection vers la connexion…</p> : <form className="public-form" onSubmit={submit}><label>Nouveau mot de passe<input type="password" name="password" minLength={12} required autoComplete="new-password"/></label><p>12 caractères minimum avec une minuscule, une majuscule et un chiffre.</p><ErrorMessage value={error}/><button className="primary-action" disabled={!token || busy}>{busy ? 'Mise à jour…' : 'Changer le mot de passe'}</button></form>}</div></main>
 }
 
 function AdminLayout() {
@@ -351,19 +321,13 @@ function InquiryManager({ path, kind }: { path: string; kind: 'quote' | 'message
     try { await apiSend(`${path}/${row.id}`, 'DELETE'); reload() }
     catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Suppression impossible.') }
   }
-  const reply = async (row: ContactRecord) => {
-    const body = window.prompt(`Répondre à ${row.email} :`)
-    if (!body?.trim()) return
-    try { await apiSend(`${path}/${row.id}/reply`, 'POST', { message: body }); reload() }
-    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Envoi impossible.') }
-  }
   const updateNotes = async (row: QuoteRecord) => {
     const internalNotes = window.prompt('Notes internes pour cette demande :', row.internalNotes || '')
     if (internalNotes === null) return
     try { await apiSend(`${path}/${row.id}/status`, 'PATCH', { status: row.status, internalNotes }); reload() }
     catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Mise à jour impossible.') }
   }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">BOÎTE DE RÉCEPTION <i/></p><h1>{kind === 'quote' ? 'Demandes de devis' : 'Messages de contact'}</h1><p>Demandes reçues depuis le site et enregistrées par le serveur.</p></div></div><ErrorMessage value={message}/><ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Demandeur</th><th>Coordonnées</th><th>{kind === 'quote' ? 'Projet / budget' : 'Message'}</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.fullName}</strong></td><td>{row.email}<small className="table-subtext">{row.phone}</small></td><td>{kind === 'quote' ? <>{(row as QuoteRecord).serviceType}: {(row as QuoteRecord).projectDescription}<small className="table-subtext">{(row as QuoteRecord).budgetRange} · {(row as QuoteRecord).desiredDeadline}</small></> : <>{(row as ContactRecord).subject}: {(row as ContactRecord).message}</>}</td><td>{new Date(row.createdAt).toLocaleDateString()}</td><td><select aria-label={`Statut ${row.fullName}`} value={row.status} onChange={(event) => void changeStatus(row, event.target.value)}>{statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</select></td><td className="table-actions">{kind === 'message' ? <button onClick={() => void reply(row as ContactRecord)}>Répondre</button> : <button onClick={() => void updateNotes(row as QuoteRecord)}>Notes</button>}<button className="danger-action" onClick={() => void remove(row)}>Supprimer</button></td></tr>)}</tbody></table>{!loading && rows.length === 0 && <div className="admin-empty">Aucune demande reçue.</div>}</div></section></>
+  return <><div className="admin-page-heading"><div><p className="eyebrow">BOÎTE DE RÉCEPTION <i/></p><h1>{kind === 'quote' ? 'Demandes de devis' : 'Messages de contact'}</h1><p>Demandes reçues depuis le site et enregistrées par le serveur.</p></div></div><ErrorMessage value={message}/><ApiState loading={loading} error={error} onRetry={reload}/><section className="admin-panel"><div className="admin-table-wrap"><table><thead><tr><th>Demandeur</th><th>Coordonnées</th><th>{kind === 'quote' ? 'Projet / budget' : 'Message'}</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.fullName}</strong></td><td>{row.email}<small className="table-subtext">{row.phone}</small></td><td>{kind === 'quote' ? <>{(row as QuoteRecord).serviceType}: {(row as QuoteRecord).projectDescription}<small className="table-subtext">{(row as QuoteRecord).budgetRange} · {(row as QuoteRecord).desiredDeadline}</small></> : <>{(row as ContactRecord).subject}: {(row as ContactRecord).message}</>}</td><td>{new Date(row.createdAt).toLocaleDateString()}</td><td><select aria-label={`Statut ${row.fullName}`} value={row.status} onChange={(event) => void changeStatus(row, event.target.value)}>{statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</select></td><td className="table-actions">{kind === 'quote' && <button onClick={() => void updateNotes(row as QuoteRecord)}>Notes</button>}<button className="danger-action" onClick={() => void remove(row)}>Supprimer</button></td></tr>)}</tbody></table>{!loading && rows.length === 0 && <div className="admin-empty">Aucune demande reçue.</div>}</div></section></>
 }
 
 function EnrollmentManager() {
@@ -410,7 +374,7 @@ function SiteSettingsManager() {
   const { data, loading, error, reload } = useApiData<Record<string, string>>('/admin/settings')
   if (!data) {
     return <>
-      <div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>Paramètres du site</h1><p>Coordonnées publiques, réseaux sociaux, SEO et e-mail destinataire des notifications.</p></div></div>
+      <div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>Paramètres du site</h1><p>Coordonn?es publiques, r?seaux sociaux et r?f?rencement du site.</p></div></div>
       <ApiState loading={loading} error={error} onRetry={reload}/>
     </>
   }
@@ -428,7 +392,7 @@ function SiteSettingsForm({ initialValues, reload }: { initialValues: Record<str
     catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Enregistrement impossible.') }
     finally { setBusy(false) }
   }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>Paramètres du site</h1><p>Coordonnées publiques, réseaux sociaux, SEO et e-mail destinataire des notifications.</p></div></div><form className="admin-panel admin-settings-form" onSubmit={(event) => void submit(event)}><div className="form-two-columns">{Object.entries(values).map(([key, value]) => <label key={key}>{key}<input value={value} onChange={(event) => setValues((previous) => ({ ...previous, [key]: event.target.value }))}/></label>)}</div><div className="form-two-columns"><label>Nouvelle clé de paramètre<input value={newKey} onChange={(event) => setNewKey(event.target.value)} placeholder="ex. contact.opening-hours"/></label><button className="secondary-action" type="button" disabled={!newKey.trim() || Object.hasOwn(values, newKey.trim())} onClick={() => { const key = newKey.trim(); if (key && !Object.hasOwn(values, key)) setValues((previous) => ({ ...previous, [key]: '' })); setNewKey('') }}>Ajouter une clé</button></div>{!Object.keys(values).length && <p>Aucun paramètre enregistré. Créez des clés comme site.name, contact.email, social.facebook ou seo.home.title.</p>}<ErrorMessage value={message}/><button className="primary-action" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer les paramètres'}</button></form></>
+  return <><div className="admin-page-heading"><div><p className="eyebrow">CONFIGURATION <i/></p><h1>Paramètres du site</h1><p>Coordonn?es publiques, r?seaux sociaux et r?f?rencement du site.</p></div></div><form className="admin-panel admin-settings-form" onSubmit={(event) => void submit(event)}><div className="form-two-columns">{Object.entries(values).map(([key, value]) => <label key={key}>{key}<input value={value} onChange={(event) => setValues((previous) => ({ ...previous, [key]: event.target.value }))}/></label>)}</div><div className="form-two-columns"><label>Nouvelle clé de paramètre<input value={newKey} onChange={(event) => setNewKey(event.target.value)} placeholder="ex. contact.opening-hours"/></label><button className="secondary-action" type="button" disabled={!newKey.trim() || Object.hasOwn(values, newKey.trim())} onClick={() => { const key = newKey.trim(); if (key && !Object.hasOwn(values, key)) setValues((previous) => ({ ...previous, [key]: '' })); setNewKey('') }}>Ajouter une clé</button></div>{!Object.keys(values).length && <p>Aucun paramètre enregistré. Créez des clés comme site.name, contact.email, social.facebook ou seo.home.title.</p>}<ErrorMessage value={message}/><button className="primary-action" disabled={busy}>{busy ? 'Enregistrement…' : 'Enregistrer les paramètres'}</button></form></>
 }
 
 function NewsletterManager() {
@@ -516,7 +480,7 @@ function SuperAdminGuard() {
 
 export function AdminRoutes() {
   return <Routes>
-    <Route path="login" element={<AdminLogin/>}/><Route path="forgot-password" element={<AdminLogin/>}/><Route path="reset-password" element={<ResetPassword/>}/>
+    <Route path="login" element={<AdminLogin/>}/><Route path="forgot-password" element={<Navigate to="/admin/login" replace/>}/><Route path="reset-password" element={<Navigate to="/admin/login" replace/>}/>
     <Route element={<Guarded><AdminLayout/></Guarded>}>
       <Route index element={<AdminDashboard/>}/><Route path="content/:resource" element={<ContentManager/>}/><Route path="sessions" element={<TrainingSessionManager/>}/>
       <Route path="requests/:requestType" element={<RequestManager/>}/><Route path="media" element={<MediaManager/>}/><Route path="settings" element={<SiteSettingsManager/>}/>

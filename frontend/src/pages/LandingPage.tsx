@@ -52,11 +52,8 @@ function LandingPage() {
   useLandingAnimations(pageRef)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('Our Vision')
-  const [emailSent, setEmailSent] = useState(false)
-  const [email, setEmail] = useState('')
   const [contactSent, setContactSent] = useState(false)
   const [contactError, setContactError] = useState('')
-  const [subscriptionError, setSubscriptionError] = useState('')
   const [sendingContact, setSendingContact] = useState(false)
   const emailAddress = settings?.['contact.email'] || 'contact@novatech.cm'
   const address = settings?.['contact.address'] || (lang === 'fr' ? 'Cameroun' : 'Cameroon')
@@ -66,17 +63,6 @@ function LandingPage() {
   const phoneHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : contactPath
   const addressHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 
-  const subscribe = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setSubscriptionError('')
-    try {
-      await apiSend('/newsletter/subscriptions', 'POST', { email, consent: true, website: '' })
-      setEmailSent(true)
-      setEmail('')
-    } catch (reason) {
-      setSubscriptionError(reason instanceof ApiError ? reason.message : (lang === 'fr' ? 'Inscription impossible pour le moment.' : 'Unable to subscribe right now.'))
-    }
-  }
 
   const sendContact = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -119,7 +105,7 @@ function LandingPage() {
   return (
     <main id="top" ref={pageRef}>
       <header className="site-header">
-        <div className="topbar"><div className="topbar-inner"><a className="topbar-item" href={`mailto:${emailAddress}`}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2"/><path d="m3.5 5 6.5 5 6.5-5"/></svg><span>{emailAddress}</span></a><a className="topbar-item" href={addressHref} target="_blank" rel="noreferrer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8.2c0 4.1-6 9.3-6 9.3S4 12.3 4 8.2a6 6 0 1 1 12 0Z"/><circle cx="10" cy="8" r="2"/></svg><span>{address}</span></a><div className="top-links"><a href={phoneHref}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15.5 3.5 17l.6-3.1A6.5 6.5 0 1 1 6 16.2"/><path d="M7 7.3c.5 2.4 2 4 4.5 4.7l1.2-1.2 2 .9c-.1 1.1-.8 1.8-1.8 1.8-3.2-.2-5.8-2.8-6-6 0-1 .7-1.7 1.7-1.8l.9 2-1.1 1.1"/></svg><span>{lang === 'fr' ? 'Assistance' : 'Support'}</span></a><Link to={contactPath}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4.5h14v11H3zM3.5 5l6.5 5 6.5-5"/><path d="M6 2.5h8"/></svg><span>{lang === 'fr' ? 'Contact' : 'Contact'}</span></Link></div></div></div>
+        <div className="topbar"><div className="topbar-inner"><Link className="topbar-item" to={contactPath}><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2"/><path d="m3.5 5 6.5 5 6.5-5"/></svg><span>{emailAddress}</span></Link><a className="topbar-item" href={addressHref} target="_blank" rel="noreferrer"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8.2c0 4.1-6 9.3-6 9.3S4 12.3 4 8.2a6 6 0 1 1 12 0Z"/><circle cx="10" cy="8" r="2"/></svg><span>{address}</span></a><div className="top-links"><a href={phoneHref}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15.5 3.5 17l.6-3.1A6.5 6.5 0 1 1 6 16.2"/><path d="M7 7.3c.5 2.4 2 4 4.5 4.7l1.2-1.2 2 .9c-.1 1.1-.8 1.8-1.8 1.8-3.2-.2-5.8-2.8-6-6 0-1 .7-1.7 1.7-1.8l.9 2-1.1 1.1"/></svg><span>{lang === 'fr' ? 'Assistance' : 'Support'}</span></a><Link to={contactPath}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4.5h14v11H3zM3.5 5l6.5 5 6.5-5"/><path d="M6 2.5h8"/></svg><span>{lang === 'fr' ? 'Contact' : 'Contact'}</span></Link></div></div></div>
         <nav className="navbar"><Brand light/><button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} aria-label={lang === 'fr' ? 'Ouvrir le menu' : 'Open menu'} aria-expanded={menuOpen}>☰</button><div className={`nav-links${menuOpen ? ' nav-open' : ''}`}><Link className="selected" to={`/${lang}`} onClick={() => setMenuOpen(false)}>{t('nav.home')}</Link><Link to={`/${lang}/${lang === 'fr' ? 'a-propos' : 'about'}`}>{t('nav.about')}</Link><Link to={`/${lang}/services`}>{t('nav.services')}</Link><Link to={`/${lang}/${lang === 'fr' ? 'realisations' : 'projects'}`}>{t('nav.projects')}</Link><Link to={`/${lang}/${lang === 'fr' ? 'formations' : 'training'}`}>{t('nav.training')}</Link><Link to={`/${lang}/${lang === 'fr' ? 'equipe' : 'team'}`}>{t('nav.team')}</Link><Link to={`/${lang}/${lang === 'fr' ? 'contact' : 'contact'}`}>{t('nav.contact')}</Link><span className="home-language"><Link to="/fr" aria-current={lang === 'fr' ? 'page' : undefined} onClick={() => { void i18n.changeLanguage('fr'); localStorage.setItem('nova-language', 'fr') }}>FR</Link> / <Link to="/en" aria-current={lang === 'en' ? 'page' : undefined} onClick={() => { void i18n.changeLanguage('en'); localStorage.setItem('nova-language', 'en') }}>EN</Link></span></div><div className="nav-actions"><Link className="home-login" to="/admin/login">{lang === 'fr' ? 'Se connecter' : 'Sign in'}</Link><Link className="home-quote" to={'/' + lang + '/' + (lang === 'fr' ? 'devis' : 'quote')}>{t('nav.quote')}</Link></div></nav>
       </header>
 
@@ -181,13 +167,7 @@ function LandingPage() {
 
       <section className="cta-section"><div className="container cta-inner"><Brand light/><h2>{t('home.cta')}</h2><Link className="button button-white" to={'/' + lang + '/' + (lang === 'fr' ? 'devis' : 'quote')}>{t('nav.quote')}</Link></div></section>
 
-      <footer className="footer" id="footer"><div className="container footer-grid"><div className="footer-about"><Brand light/><p>{lang === 'fr' ? 'Nous concevons des solutions numériques et transmettons les compétences qui font grandir les projets.' : 'We build digital solutions and share the skills that help projects grow.'}</p><div className="socials"><a href="#top">𝕏</a><a href="#top">f</a><a href="#top">◎</a><a href="#top">◉</a></div></div><div className="footer-column"><h3>Explore</h3><a href="#about">About Company</a><a href="#about">Meet the Team</a><a href="#news">News &amp; Media</a><a href="#projects">Our Projects</a><a href="#contact">Contact</a></div><div className="footer-column contact-column"><h3>Contact</h3><p>{address}</p><a href={`mailto:${emailAddress}`}>✉ &nbsp;{emailAddress}</a>{phone && <a href={`tel:${phone}`}>☎ &nbsp;{phone}</a>}</div><div className="footer-column gallery-column"><h3>Gallery</h3><div className="gallery">{[photos.team, photos.meeting2, photos.creator, photos.office, photos.meeting, photos.meeting3].map((src, i) => <img src={src} alt={`Galerie NOVA-TECH-SOLUTION ${i + 1}`} key={src}/>)}</div><form className="subscribe" onSubmit={(event) => void subscribe(event)}>
-            <label htmlFor="newsletter-email">{lang === 'fr' ? 'Recevoir nos actualités' : 'Get our updates'}</label>
-            <div><input id="newsletter-email" type="email" placeholder={lang === 'fr' ? 'Votre adresse e-mail' : 'Your email address'} value={email} onChange={(event) => setEmail(event.target.value)} required/><button type="submit" aria-label={lang === 'fr' ? 'S’abonner' : 'Subscribe'}>→</button></div>
-            <label className="subscribe-consent"><input type="checkbox" required/><span>{lang === 'fr' ? 'J’accepte de recevoir les actualités NovaTech.' : 'I agree to receive NovaTech updates.'}</span></label>
-            {subscriptionError && <small className="form-error" role="alert">{subscriptionError}</small>}
-            {emailSent && <small className="form-success" role="status">{lang === 'fr' ? 'Inscription enregistrée.' : 'Subscription received.'}</small>}
-          </form></div></div><div className="container copyright">© Copyright reserved by NOVA-TECH-SOLUTION. Made with care.</div></footer>
+      <footer className="footer" id="footer"><div className="container footer-grid"><div className="footer-about"><Brand light/><p>{lang === 'fr' ? 'Nous concevons des solutions numériques et transmettons les compétences qui font grandir les projets.' : 'We build digital solutions and share the skills that help projects grow.'}</p><div className="socials"><a href="#top">𝕏</a><a href="#top">f</a><a href="#top">◎</a><a href="#top">◉</a></div></div><div className="footer-column"><h3>Explore</h3><a href="#about">About Company</a><a href="#about">Meet the Team</a><a href="#news">News &amp; Media</a><a href="#projects">Our Projects</a><a href="#contact">Contact</a></div><div className="footer-column contact-column"><h3>Contact</h3><p>{address}</p><Link to={contactPath}>✉ &nbsp;{emailAddress}</Link>{phone && <a href={`tel:${phone}`}>☎ &nbsp;{phone}</a>}</div><div className="footer-column gallery-column"><h3>Gallery</h3><div className="gallery">{[photos.team, photos.meeting2, photos.creator, photos.office, photos.meeting, photos.meeting3].map((src, i) => <img src={src} alt={`Galerie NOVA-TECH-SOLUTION ${i + 1}`} key={src}/>)}</div><div className="subscribe"><p>{lang === 'fr' ? 'Newsletter temporairement suspendue.' : 'Newsletter temporarily paused.'}</p></div></div></div><div className="container copyright">© Copyright reserved by NOVA-TECH-SOLUTION. Made with care.</div></footer>
       <a href="#top" className="back-top" aria-label="Retour en haut">⌃</a>
 
       <a className="whatsapp-float" href={whatsapp ? `https://wa.me/${whatsapp}` : `/${lang}/contact#contact`} aria-label="WhatsApp"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 11.7a8 8 0 0 1-11.8 7L4 20l1.3-4A8 8 0 1 1 20 11.7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M9 8.5c.5 2.8 2.1 4.4 4.9 5l1.1-1.2 2 1c-.1 1.1-.8 1.8-2 1.8-3.7-.2-6.8-3.3-7-7 0-1.2.7-1.9 1.8-2l1 2-1.8.4Z" fill="currentColor"/></svg></a>

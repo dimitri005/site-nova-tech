@@ -6,11 +6,6 @@ import com.novatechsolution.identity.dto.LoginResponse;
 import com.novatechsolution.identity.repository.AdminUserRepository;
 import com.novatechsolution.identity.domain.RefreshSession;
 import com.novatechsolution.identity.repository.RefreshSessionRepository;
-import com.novatechsolution.identity.domain.PasswordResetToken;
-import com.novatechsolution.identity.dto.ForgotPasswordRequest;
-import com.novatechsolution.identity.dto.ResetPasswordRequest;
-import com.novatechsolution.identity.repository.PasswordResetTokenRepository;
-import com.novatechsolution.notifications.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +15,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.stereotype.Service;
@@ -42,9 +36,6 @@ public class IdentityService {
     private final AuthenticationManager authenticationManager;
     private final AdminUserRepository users;
     private final RefreshSessionRepository refreshSessions;
-    private final PasswordResetTokenRepository resetTokens;
-    private final NotificationService notifications;
-    private final PasswordEncoder passwordEncoder;
     private final ObjectProvider<JwtEncoder> jwtEncoderProvider;
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -57,12 +48,6 @@ public class IdentityService {
 
     @Value("${novatech.security.jwt.refresh-token-ttl:PT8H}")
     private Duration refreshTokenTtl;
-
-    @Value("${novatech.security.jwt.password-reset-ttl:PT30M}")
-    private Duration passwordResetTtl;
-
-    @Value("${novatech.site.public-url:http://localhost:5173}")
-    private String publicSiteUrl;
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -96,33 +81,6 @@ public class IdentityService {
         }
         refreshSessions.findActiveForUpdate(hashToken(rawRefreshToken))
                 .ifPresent(session -> session.setRevokedAt(Instant.now()));
-    }
-
-    @Transactional
-    public void forgotPassword(ForgotPasswordRequest request) {
-        users.findByEmailIgnoreCase(request.email().trim()).filter(AdminUser::isEnabled).ifPresent(user -> {
-            byte[] random = new byte[32]; RANDOM.nextBytes(random);
-            String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
-            PasswordResetToken token = new PasswordResetToken(); token.setAdminUserId(user.getId());
-            token.setTokenHash(hashToken(raw)); token.setExpiresAt(Instant.now().plus(passwordResetTtl));
-            resetTokens.save(token);
-            notifications.send(user.getEmail(), "Réinitialisation du mot de passe NovaTech",
-                    "Pour définir un nouveau mot de passe, ouvrez ce lien dans les 30 minutes :\n"
-                            + publicSiteUrl + "/admin/reset-password?token=" + raw);
-        });
-    }
-
-    @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-        PasswordResetToken token = resetTokens.findActiveForUpdate(hashToken(request.token()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lien de réinitialisation invalide ou expiré."));
-        Instant now = Instant.now();
-        if (!token.getExpiresAt().isAfter(now)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lien de réinitialisation invalide ou expiré.");
-        AdminUser user = users.findById(token.getAdminUserId()).filter(AdminUser::isEnabled)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lien de réinitialisation invalide ou expiré."));
-        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        token.setUsedAt(now);
-        refreshSessions.findAllByAdminUserIdAndRevokedAtIsNull(user.getId()).forEach(session -> session.setRevokedAt(now));
     }
 
     private LoginResponse issueTokens(AdminUser user) {

@@ -4,11 +4,9 @@ import com.novatechsolution.enrollment.domain.Enrollment;
 import com.novatechsolution.enrollment.domain.EnrollmentStatus;
 import com.novatechsolution.enrollment.dto.EnrollmentRequest;
 import com.novatechsolution.enrollment.repository.EnrollmentRepository;
-import com.novatechsolution.notifications.service.NotificationService;
 import com.novatechsolution.training.dto.SessionRegistration;
 import com.novatechsolution.training.service.TrainingService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +19,6 @@ import java.util.UUID;
 public class EnrollmentService {
     private final EnrollmentRepository enrollments;
     private final TrainingService trainings;
-    private final NotificationService notifications;
-    @Value("${novatech.site.public-url:http://localhost:5173}") private String siteUrl;
 
     @Transactional
     public Enrollment create(EnrollmentRequest request) {
@@ -36,11 +32,6 @@ public class EnrollmentService {
         enrollment.setEmail(request.email().trim().toLowerCase()); enrollment.setPhone(request.phone().trim());
         enrollment.setPreferredLanguage(request.preferredLanguage().toLowerCase()); enrollment.setConsent(true);
         Enrollment saved = enrollments.save(enrollment);
-        notifications.notifyCompany("Nouvelle pré-inscription NovaTech",
-                saved.getFullName() + " s'est pré-inscrit(e) à " + session.courseTitleFr()
-                        + " (" + session.startsAt() + "). Contact : " + saved.getEmail() + ", " + saved.getPhone());
-        notifications.send(saved.getEmail(), "Votre pré-inscription NovaTech",
-                "Bonjour " + saved.getFullName() + ",\n\nNous avons reçu votre demande de pré-inscription. Notre équipe vous contactera pour confirmer votre place. Aucun paiement en ligne n'est demandé.\n\n" + siteUrl);
         return saved;
     }
 

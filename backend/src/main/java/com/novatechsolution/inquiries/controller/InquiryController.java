@@ -5,7 +5,6 @@ import com.novatechsolution.inquiries.domain.QuoteRequest;
 import com.novatechsolution.inquiries.dto.ContactMessageRequest;
 import com.novatechsolution.inquiries.dto.InquiryStatusRequest;
 import com.novatechsolution.inquiries.dto.QuoteRequestForm;
-import com.novatechsolution.inquiries.dto.ReplyRequest;
 import com.novatechsolution.inquiries.service.InquiryService;
 import com.novatechsolution.shared.web.ApiResponse;
 import jakarta.validation.Valid;
@@ -34,10 +33,6 @@ public class InquiryController {
     @PatchMapping("/api/v1/admin/contact-messages/{id}/status") @PreAuthorize("hasAnyRole('SUPER_ADMIN','EDITOR')")
     public ApiResponse<ContactMessage> setMessageStatus(@PathVariable UUID id, @Valid @RequestBody InquiryStatusRequest request) {
         return ApiResponse.of(service.setMessageStatus(id, request));
-    }
-    @PostMapping("/api/v1/admin/contact-messages/{id}/reply") @PreAuthorize("hasAnyRole('SUPER_ADMIN','EDITOR')")
-    public ResponseEntity<Void> reply(@PathVariable UUID id, @Valid @RequestBody ReplyRequest request) {
-        service.reply(id, request.message()); return ResponseEntity.noContent().build();
     }
     @DeleteMapping("/api/v1/admin/contact-messages/{id}") @PreAuthorize("hasAnyRole('SUPER_ADMIN','EDITOR')")
     public ResponseEntity<Void> deleteMessage(@PathVariable UUID id) { service.deleteMessage(id); return ResponseEntity.noContent().build(); }

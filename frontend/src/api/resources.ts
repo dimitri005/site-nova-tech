@@ -20,7 +20,6 @@ export const publicApi = {
   contact: (body: unknown) => apiSend('/contact-messages', 'POST', body),
   quote: (body: unknown) => apiSend('/quote-requests', 'POST', body),
   enroll: (body: unknown) => apiSend('/enrollments', 'POST', body),
-  subscribe: (body: unknown) => apiSend('/newsletter/subscriptions', 'POST', body),
   unsubscribe: (token: string) => apiSend(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`, 'POST'),
 }
 

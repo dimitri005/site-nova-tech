@@ -1,10 +1,8 @@
 package com.novatechsolution.newsletter.controller;
 
-import com.novatechsolution.newsletter.dto.NewsletterRequest;
 import com.novatechsolution.newsletter.dto.NewsletterSubscriberResponse;
 import com.novatechsolution.newsletter.service.NewsletterService;
 import com.novatechsolution.shared.web.ApiResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -21,7 +19,6 @@ import java.util.List;
 public class NewsletterController {
     private final NewsletterService service;
     @Value("${novatech.site.public-url:http://localhost:5173}") private String publicSiteUrl;
-    @PostMapping("/api/v1/newsletter/subscriptions") public ResponseEntity<ApiResponse<NewsletterSubscriberResponse>> subscribe(@Valid @RequestBody NewsletterRequest r){return ResponseEntity.accepted().body(ApiResponse.of(service.subscribe(r.email(),Boolean.TRUE.equals(r.consent()),r.website()),"Demande d'inscription reçue."));}
     @PostMapping("/api/v1/newsletter/unsubscribe") public ResponseEntity<Void> unsubscribe(@RequestParam String token){service.unsubscribe(token);return ResponseEntity.noContent().build();}
     @GetMapping("/api/v1/newsletter/unsubscribe") public ResponseEntity<Void> unsubscribeByLink(@RequestParam String token){
         String target=publicSiteUrl.replaceAll("/$", "")+"/newsletter/unsubscribe?token="+URLEncoder.encode(token,StandardCharsets.UTF_8);

@@ -37,11 +37,9 @@ final class PublicFormRateLimitFilter extends OncePerRequestFilter {
         }
         String path = request.getServletPath();
         return !("/api/v1/auth/login".equals(path)
-                || "/api/v1/auth/password/forgot".equals(path)
                 || "/api/v1/contact-messages".equals(path)
                 || "/api/v1/quote-requests".equals(path)
                 || "/api/v1/enrollments".equals(path)
-                || "/api/v1/newsletter/subscriptions".equals(path)
                 || "/api/v1/newsletter/unsubscribe".equals(path));
     }
 

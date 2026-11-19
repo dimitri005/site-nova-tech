@@ -8,7 +8,6 @@ import com.novatechsolution.inquiries.dto.InquiryStatusRequest;
 import com.novatechsolution.inquiries.dto.QuoteRequestForm;
 import com.novatechsolution.inquiries.repository.ContactMessageRepository;
 import com.novatechsolution.inquiries.repository.QuoteRequestRepository;
-import com.novatechsolution.notifications.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,7 +21,6 @@ import java.util.UUID;
 public class InquiryService {
     private final ContactMessageRepository messages;
     private final QuoteRequestRepository quotes;
-    private final NotificationService notifications;
 
     @Transactional
     public ContactMessage createContact(ContactMessageRequest r) {
@@ -31,10 +29,6 @@ public class InquiryService {
         item.setEmail(r.email().trim().toLowerCase()); item.setPhone(r.phone()); item.setSubject(r.subject().trim());
         item.setMessage(r.message().trim()); item.setLanguage(language(r.language())); item.setConsent(true);
         ContactMessage saved = messages.save(item);
-        notifications.notifyCompany("Nouveau message - " + saved.getSubject(),
-                saved.getFullName() + " <" + saved.getEmail() + ">\n" + saved.getPhone() + "\n\n" + saved.getMessage());
-        notifications.send(saved.getEmail(), "Votre message a bien été reçu - NovaTech",
-                "Bonjour " + saved.getFullName() + ",\n\nNous avons bien reçu votre message et vous répondrons rapidement.");
         return saved;
     }
 
@@ -45,12 +39,6 @@ public class InquiryService {
         item.setPhone(r.phone()); item.setServiceType(r.serviceType().trim()); item.setProjectDescription(r.projectDescription().trim());
         item.setBudgetRange(r.budgetRange()); item.setDesiredDeadline(r.desiredDeadline()); item.setLanguage(language(r.language())); item.setConsent(true);
         QuoteRequest saved = quotes.save(item);
-        notifications.notifyCompany("Nouvelle demande de devis NovaTech",
-                saved.getFullName() + " <" + saved.getEmail() + ">\nService : " + saved.getServiceType()
-                        + "\nBudget : " + saved.getBudgetRange() + "\nDélai : " + saved.getDesiredDeadline()
-                        + "\n\n" + saved.getProjectDescription());
-        notifications.send(saved.getEmail(), "Votre demande de devis a bien été reçue - NovaTech",
-                "Bonjour " + saved.getFullName() + ",\n\nNous avons bien reçu votre demande de devis. Notre équipe vous recontactera.");
         return saved;
     }
 
@@ -74,12 +62,6 @@ public class InquiryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Statut invalide pour une demande de devis.");
         QuoteRequest q = quotes.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de devis introuvable."));
         q.setStatus(r.status()); q.setInternalNotes(r.internalNotes()); q.setUpdatedAt(Instant.now()); return q;
-    }
-    @Transactional
-    public void reply(UUID id, String body) {
-        ContactMessage m = messages.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message introuvable."));
-        notifications.send(m.getEmail(), "Réponse de NovaTech Solution - " + m.getSubject(), body);
-        m.setStatus(InquiryStatus.RESOLVED); m.setUpdatedAt(Instant.now());
     }
     @Transactional public void deleteMessage(UUID id) { if (!messages.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Message introuvable."); messages.deleteById(id); }
     @Transactional public void deleteQuote(UUID id) { if (!quotes.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de devis introuvable."); quotes.deleteById(id); }

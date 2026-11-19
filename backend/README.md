@@ -13,7 +13,7 @@ API REST bilingue Spring Boot 4 / Java 21 / PostgreSQL pour le site vitrine et s
    ```
 
 4. Définir `ADMIN_INITIAL_EMAIL` et `ADMIN_INITIAL_PASSWORD` pour créer le premier super administrateur. Le mot de passe doit faire au moins 12 caractères et inclure une minuscule, une majuscule et un chiffre. Le bootstrap ne remplace jamais un compte existant.
-5. Adapter `CORS_ALLOWED_ORIGINS` à l'URL du frontend. Les réglages SMTP sont nécessaires pour recevoir les notifications e-mail et les réinitialisations de mot de passe.
+5. Adapter `CORS_ALLOWED_ORIGINS` à l'URL du frontend. Les notifications et la récupération du mot de passe par e-mail sont désactivées temporairement. Les formulaires continuent d'enregistrer les adresses et demandes dans la base.
 6. Lancer depuis `backend` :
 
    ```powershell

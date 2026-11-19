@@ -80,9 +80,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/error", "/media/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
-                                "/api/v1/auth/password/forgot",
-                                "/api/v1/auth/password/reset").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/services/**", "/api/v1/projects/**", "/api/v1/trainings/**",
                                 "/api/v1/team/**", "/api/v1/testimonials/**", "/api/v1/partners/**",
@@ -91,7 +89,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/contact-messages",
                                 "/api/v1/quote-requests", "/api/v1/enrollments",
-                                "/api/v1/newsletter/subscriptions", "/api/v1/newsletter/unsubscribe").permitAll()
+                                "/api/v1/newsletter/unsubscribe").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/newsletter/unsubscribe").permitAll()
                         .anyRequest().authenticated());
         http.addFilterBefore(publicFormRateLimitFilter, AnonymousAuthenticationFilter.class);

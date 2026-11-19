@@ -1,7 +1,8 @@
 package com.novatechsolution.i18n.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,7 +37,7 @@ public class TranslationService {
     private Map<String, Object> loadCatalog(ObjectMapper objectMapper, String locale) {
         try (var input = new ClassPathResource("i18n/messages_" + locale + ".json").getInputStream()) {
             return objectMapper.readValue(input, CATALOG_TYPE);
-        } catch (IOException exception) {
+        } catch (IOException | JacksonException exception) {
             throw new IllegalStateException("Impossible de charger le catalogue de traduction: " + locale, exception);
         }
     }

@@ -10,16 +10,15 @@ Le dossier `student` contient du code hérité de DUDEN utilisé uniquement comm
 
 | Module | Responsabilités |
 |---|---|
-| `identity` | Comptes d'administration, rôles `SUPER_ADMIN`/`EDITOR`, BCrypt, JWT, renouvellement de session et réinitialisation du mot de passe |
+| `identity` | Comptes administrateur, r?les `SUPER_ADMIN`/`EDITOR`, BCrypt, JWT et renouvellement de session |
 | `services` | Les cinq pôles d'activité, contenus français/anglais, ordre et publication |
 | `projects` | Réalisations, client, catégorie, technologies, galerie, liens et mise en avant |
 | `training` | Catalogue bilingue, programme, tarif indicatif et sessions en présentiel avec capacité |
 | `enrollment` | Pré-inscriptions sans paiement, consentement, suivi, réservation transactionnelle et export CSV |
 | `team` | Fondateurs et personnel, biographies, photos et réseaux |
-| `inquiries` | Messages de contact, demandes de devis, statuts, notes internes et réponses e-mail |
+| `inquiries` | Messages de contact, demandes de devis, statuts et notes internes |
 | `media` | Bibliothèque locale JPEG/PNG, vérification du contenu réel, redimensionnement et compression |
 | `sitecontent` / `settings` | Pages légales et statiques, coordonnées, réseaux sociaux, pied de page et SEO |
-| `notifications` | Notifications SMTP destinées à l'entreprise et aux demandeurs |
 | `dashboard` | Compteurs de messages, devis, pré-inscriptions, projets et articles publiés |
 | `testimonials` / `partners` | Témoignages et logos publiés |
 | `blog` / `newsletter` / `audit` | Articles bilingues avec HTML nettoyé, abonnements/export et journal des actions admin |
@@ -29,8 +28,8 @@ Les répertoires `event` et `mapper` restent disponibles lorsque le domaine en a
 ## Routes clés
 
 - Lecture publique : `GET /services`, `/projects`, `/trainings`, `/trainings/{slug}/sessions`, `/team`, `/testimonials`, `/partners`, `/articles` et `/site-content/pages`.
-- Formulaires : `POST /contact-messages`, `/quote-requests`, `/enrollments` et `/newsletter/subscriptions`.
-- Authentification : `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/password/forgot` et `/auth/password/reset`.
+- Formulaires : `POST /contact-messages`, `/quote-requests` et `/enrollments`.
+- Authentification : `POST /auth/login`, `/auth/refresh` et `/auth/logout`.
 - Gestion : CRUD sous `/api/v1/admin/**`; les comptes sont réservés à `SUPER_ADMIN`, les contenus à `SUPER_ADMIN` ou `EDITOR`.
 - Documentation : Swagger UI sous `/swagger-ui.html`, OpenAPI sous `/v3/api-docs`.
 

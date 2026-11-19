@@ -25,11 +25,6 @@ public class SiteSettingsService {
     }
     @Transactional(readOnly = true)
     public Map<String, String> adminValues() { return settings.findById("default").map(s -> new LinkedHashMap<>(s.getValues())).orElseGet(LinkedHashMap::new); }
-    @Transactional(readOnly = true)
-    public String notificationRecipient() {
-        return settings.findById("default").map(s -> s.getValues().get("notifications.email"))
-                .filter(value -> !value.isBlank()).orElse(null);
-    }
     @Transactional
     public Map<String, String> replace(SiteSettingsRequest request) {
         SiteSettings entity = settings.findById("default").orElseGet(SiteSettings::new);
@@ -39,9 +34,6 @@ public class SiteSettingsService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Clé de paramètre invalide.");
             if (value == null || value.length() > 4000)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valeur de paramètre invalide.");
-            if ("notifications.email".equals(key) && !value.isBlank()
-                    && !value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Adresse e-mail de notification invalide.");
             cleaned.put(key, value.trim());
         });
         entity.setValues(cleaned); return new LinkedHashMap<>(settings.save(entity).getValues());
