@@ -4,7 +4,7 @@ import { Link, Navigate, NavLink, Outlet, Route, Routes, useLocation, useNavigat
 import { usePageAnimations } from '../animations/usePageAnimations'
 import logo from '../assets/nova-tech-logo.png'
 import logoLight from '../assets/nova-tech-logo-light.png'
-import { ApiError, apiDownload, apiMediaUrl, apiSend, getStoredSession, isAuthenticated, login, logout } from '../api/client'
+import { ApiError, apiDownload, apiMediaUrl, apiSend, getStoredSession, isAuthenticated, login, logout, mapFieldErrors } from '../api/client'
 import { ApiState } from '../api/ApiState'
 import { homepageDefaults, homepageFieldGroups } from '../data/homepageContent'
 import { useApiData } from '../api/hooks'
@@ -240,23 +240,76 @@ function fieldsToBody(form: HTMLFormElement, fields: Field[]): Row {
 
 function EditorForm({ fields, initial, title, onCancel, onSave }: { fields: Field[]; initial?: Row | null; title: string; onCancel: () => void; onSave: (body: Row) => Promise<void> }) {
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [imageValues, setImageValues] = useState<Record<string, string>>({})
   const [uploadingField, setUploadingField] = useState('')
+  const clearFieldError = (name: string) => setFieldErrors((current) => {
+    if (!current[name]) return current
+    const next = { ...current }
+    delete next[name]
+    return next
+  })
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setError(''); setBusy(true)
-    try { await onSave({ ...fieldsToBody(event.currentTarget, fields), ...imageValues }) }
-    catch (reason) { setError(reason instanceof ApiError ? `${reason.message}${Object.values(reason.fields).length ? ` ? ${Object.values(reason.fields).join(' ')}` : ''}` : 'Enregistrement impossible.') }
-    finally { setBusy(false) }
+    event.preventDefault()
+    setError('')
+    setFieldErrors({})
+    setBusy(true)
+    const form = event.currentTarget
+    try {
+      await onSave({ ...fieldsToBody(form, fields), ...imageValues })
+    } catch (reason) {
+      if (reason instanceof ApiError && Object.keys(reason.fields).length) {
+        const mapped = mapFieldErrors(reason.fields, fields.map((field) => field.name))
+        setFieldErrors(mapped)
+        if (Object.keys(mapped).length < Object.keys(reason.fields).length) setError(reason.message)
+        const firstField = fields.find((field) => mapped[field.name])
+        if (firstField) requestAnimationFrame(() => {
+          const target = form.elements.namedItem(firstField.name)
+          if (target instanceof HTMLElement) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            target.focus({ preventScroll: true })
+          }
+        })
+      } else setError(reason instanceof ApiError ? reason.message : 'Enregistrement impossible.')
+    } finally {
+      setBusy(false)
+    }
   }
   const upload = async (field: Field, file?: File) => {
     if (!file) return
-    setError(''); setUploadingField(field.name)
-    try { const asset = await uploadAdminImage(file); setImageValues((current) => ({ ...current, [field.name]: asset.url })) }
-    catch (reason) { setError(reason instanceof ApiError ? reason.message : 'Televersement impossible.') }
-    finally { setUploadingField('') }
+    setError('')
+    setUploadingField(field.name)
+    try {
+      const asset = await uploadAdminImage(file)
+      setImageValues((current) => ({ ...current, [field.name]: asset.url }))
+      clearFieldError(field.name)
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : 'Televersement impossible.')
+    } finally {
+      setUploadingField('')
+    }
   }
-  return <form className="admin-edit-form" onSubmit={submit}><h2>{title}</h2><div className="form-two-columns">{fields.map((field) => <label key={field.name} className={field.type === 'checkbox' ? 'admin-checkbox-field' : ''}>{field.type === 'checkbox' ? <><input type="checkbox" name={field.name} defaultChecked={Boolean(initial?.[field.name])}/>{field.label}</> : <>{field.label}{field.type === 'image' ? <><input name={field.name} type="text" placeholder="https://... ou /media/..." value={imageValues[field.name] ?? fieldValue(field, initial?.[field.name])} onChange={(event) => setImageValues((current) => ({ ...current, [field.name]: event.target.value }))}/><span className="admin-image-upload"><input type="file" accept="image/jpeg,image/png" aria-label={`Televerser ${field.label}`} disabled={uploadingField === field.name} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void upload(field, file).finally(() => { input.value = '' }) }}/>{uploadingField === field.name && <small>Televersement...</small>}{imageValues[field.name] && <small>Image televersee : {imageValues[field.name]}</small>}</span></> : field.type === 'textarea' || field.type === 'list' ? <textarea name={field.name} rows={field.type === 'list' ? 3 : 4} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}/> : field.type === 'select' ? <select name={field.name} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required}><option value="">Choisir...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input name={field.name} type={field.type || 'text'} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} step={field.type === 'number' ? 'any' : undefined}/>}</>}</label>)}</div><ErrorMessage value={error}/><div className="edit-form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Annuler</button><button className="primary-action" type="submit" disabled={busy || Boolean(uploadingField)}>{busy ? 'Enregistrement...' : 'Enregistrer'}</button></div></form>
+  return <form className="admin-edit-form" onSubmit={submit} noValidate>
+    <h2>{title}</h2>
+    <div className="form-two-columns">{fields.map((field) => {
+      const message = fieldErrors[field.name]
+      const errorId = `${field.name}-validation-error`
+      const invalidProps = message ? { 'aria-invalid': true as const, 'aria-describedby': errorId } : {}
+      const clear = () => clearFieldError(field.name)
+      return <label key={field.name} className={`${field.type === 'checkbox' ? 'admin-checkbox-field' : ''}${message ? ' field-has-error' : ''}`}>
+        {field.type === 'checkbox' ? <><input type="checkbox" name={field.name} defaultChecked={Boolean(initial?.[field.name])} {...invalidProps} onChange={clear}/>{field.label}</> : <>{field.label}
+          {field.type === 'image' ? <>
+            <input name={field.name} type="text" placeholder="https://... ou /media/..." value={imageValues[field.name] ?? fieldValue(field, initial?.[field.name])} {...invalidProps} onChange={(event) => { clear(); setImageValues((current) => ({ ...current, [field.name]: event.target.value })) }}/>
+            <span className="admin-image-upload"><input type="file" accept="image/jpeg,image/png" aria-label={`Televerser ${field.label}`} disabled={uploadingField === field.name} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void upload(field, file).finally(() => { input.value = '' }) }}/>{uploadingField === field.name && <small>Televersement...</small>}{imageValues[field.name] && <small>Image televersee : {imageValues[field.name]}</small>}</span>
+          </> : field.type === 'textarea' || field.type === 'list' ? <textarea name={field.name} rows={field.type === 'list' ? 3 : 4} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} {...invalidProps} onChange={clear}/> : field.type === 'select' ? <select name={field.name} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} {...invalidProps} onChange={clear}><option value="">Choisir...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input name={field.name} type={field.type || 'text'} defaultValue={fieldValue(field, initial?.[field.name])} required={field.required} step={field.type === 'number' ? 'any' : undefined} {...invalidProps} onChange={clear}/>}
+        </>}
+        {message && <small className="field-validation-error" id={errorId} role="alert">{message}</small>}
+      </label>
+    })}</div>
+    <ErrorMessage value={error}/>
+    <div className="edit-form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Annuler</button><button className="primary-action" type="submit" disabled={busy || Boolean(uploadingField)}>{busy ? 'Enregistrement...' : 'Enregistrer'}</button></div>
+  </form>
 }
 
 function ContentManager() {
@@ -398,12 +451,31 @@ function HomepageManager() {
 function HomepageEditor({ initialValues }: { initialValues: Record<string, string> }) {
   const [values, setValues] = useState(initialValues)
   const [message, setMessage] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [uploadingField, setUploadingField] = useState('')
+  const clearHomepageFieldError = (key: string) => setFieldErrors((current) => {
+    if (!current[key]) return current
+    const next = { ...current }
+    delete next[key]
+    return next
+  })
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setBusy(true); setMessage('')
+    event.preventDefault(); setBusy(true); setMessage(''); setFieldErrors({})
     try { await apiSend('/admin/homepage', 'PUT', { values }); setMessage('Contenu de la page d?accueil enregistre.') }
-    catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Enregistrement impossible.') }
+    catch (reason) {
+      if (reason instanceof ApiError && Object.keys(reason.fields).length) {
+        const mapped = mapFieldErrors(reason.fields, Object.keys(values))
+        setFieldErrors(mapped)
+        if (Object.keys(mapped).length < Object.keys(reason.fields).length) setMessage(reason.message)
+        const firstField = Object.keys(values).find((key) => mapped[key])
+        if (firstField) requestAnimationFrame(() => {
+          const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${firstField}"]`)
+          input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          input?.focus({ preventScroll: true })
+        })
+      } else setMessage(reason instanceof ApiError ? reason.message : 'Enregistrement impossible.')
+    }
     finally { setBusy(false) }
   }
   const upload = async (key: string, file?: File) => {
@@ -413,7 +485,7 @@ function HomepageEditor({ initialValues }: { initialValues: Record<string, strin
     catch (reason) { setMessage(reason instanceof ApiError ? reason.message : 'Televersement impossible.') }
     finally { setUploadingField('') }
   }
-  return <><div className="admin-page-heading"><div><p className="eyebrow">CONTENU DU SITE <i/></p><h1>Page d'accueil</h1><p>Les textes sont bilingues. Les apercus de services, projets, formations et actualites utilisent les contenus publies dans leurs rubriques.</p></div><a className="secondary-action" href="/fr" target="_blank" rel="noreferrer">Voir le site</a></div><form className="admin-panel homepage-editor" onSubmit={(event) => void submit(event)}>{homepageFieldGroups.map((group) => <section className="homepage-editor-group" key={group.title}><h2>{group.title}</h2><div className="form-two-columns">{group.fields.map((field) => { const key = `home.${field.key}`; return <label key={field.key}>{field.label}{field.kind === 'textarea' ? <textarea rows={3} maxLength={4000} value={values[key] || ''} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}/> : <input type="text" maxLength={4000} placeholder={field.kind === 'image' ? 'https://... ou /media/...' : ''} value={values[key] || ''} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))}/>}{field.kind === 'image' && <><input type="file" accept="image/jpeg,image/png" aria-label={`Televerser ${field.label}`} disabled={uploadingField === field.key} onChange={(event) => { const file = event.currentTarget.files?.[0]; void upload(field.key, file).finally(() => { event.currentTarget.value = '' }) }}/>{values[key] && <img className="homepage-image-preview" src={values[key].startsWith('/media/') ? apiMediaUrl(values[key]) : values[key]} alt={field.label}/>}</>}</label> })}</div></section>)}<ErrorMessage value={message}/><button className="primary-action" disabled={busy || Boolean(uploadingField)}>{busy ? 'Enregistrement...' : 'Enregistrer la page d?accueil'}</button></form></>
+  return <><div className="admin-page-heading"><div><p className="eyebrow">CONTENU DU SITE <i/></p><h1>Page d'accueil</h1><p>Les textes sont bilingues. Les apercus de services, projets, formations et actualites utilisent les contenus publies dans leurs rubriques.</p></div><a className="secondary-action" href="/fr" target="_blank" rel="noreferrer">Voir le site</a></div><form className="admin-panel homepage-editor" onSubmit={(event) => void submit(event)}>{homepageFieldGroups.map((group) => <section className="homepage-editor-group" key={group.title}><h2>{group.title}</h2><div className="form-two-columns">{group.fields.map((field) => { const key = `home.${field.key}`; const fieldError = fieldErrors[key]; const errorId = `homepage-${field.key}-error`; return <label className={`homepage-field${field.kind === 'image' ? ' homepage-field-image' : ''}${fieldError ? ' field-has-error' : ''}`} key={field.key}>{field.label}{field.kind === 'textarea' ? <textarea name={key} rows={3} maxLength={4000} value={values[key] || ''} aria-invalid={Boolean(fieldError)} aria-describedby={fieldError ? errorId : undefined} onChange={(event) => { clearHomepageFieldError(key); setValues((current) => ({ ...current, [key]: event.target.value })) }}/> : <input name={key} type="text" maxLength={4000} placeholder={field.kind === 'image' ? 'https://... ou /media/...' : ''} value={values[key] || ''} aria-invalid={Boolean(fieldError)} aria-describedby={fieldError ? errorId : undefined} onChange={(event) => { clearHomepageFieldError(key); setValues((current) => ({ ...current, [key]: event.target.value })) }}/>}{field.kind === 'image' && <><input type="file" accept="image/jpeg,image/png" aria-label={`Televerser ${field.label}`} disabled={uploadingField === field.key} onChange={(event) => { const input = event.currentTarget; const file = input.files?.[0]; void upload(field.key, file).finally(() => { input.value = '' }) }}/>{values[key] && <img className="homepage-image-preview" src={values[key].startsWith('/media/') ? apiMediaUrl(values[key]) : values[key]} alt={field.label}/>}</>}{fieldError && <small className="field-validation-error" id={errorId} role="alert">{fieldError}</small>}</label> })}</div></section>)}<ErrorMessage value={message}/><button className="primary-action" disabled={busy || Boolean(uploadingField)}>{busy ? 'Enregistrement...' : 'Enregistrer la page d?accueil'}</button></form></>
 }
 
 function SiteSettingsManager() {

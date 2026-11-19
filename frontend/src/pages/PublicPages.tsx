@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, apiMediaUrl, apiSend } from '../api/client'
+import { ApiError, apiMediaUrl, apiSend, mapFieldErrors } from '../api/client'
 import { ApiState } from '../api/ApiState'
 import { useApiData } from '../api/hooks'
 import type { ArticleRecord, ProjectRecord, ServiceRecord, StaticPageRecord, TeamRecord, TrainingRecord, TrainingSessionRecord } from '../api/types'
@@ -23,9 +23,19 @@ function PageHero({ lang, title, intro }: { lang: Locale; title: string; intro?:
 function RequestForm({ lang, kind, course, sessions = [] }: { lang: Locale; kind: 'contact' | 'quote' | 'registration'; course?: TrainingRecord; sessions?: TrainingSessionRecord[] }) {
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  const clearFieldError = (name: string) => setFieldErrors((current) => {
+    if (!current[name]) return current
+    const next = { ...current }
+    delete next[name]
+    return next
+  })
+  const errorFor = (name: string) => fieldErrors[name]
+  const fieldProps = (name: string) => errorFor(name) ? { 'aria-invalid': true as const, 'aria-describedby': `${name}-field-error` } : {}
+  const fieldMessage = (name: string) => errorFor(name) ? <small className="field-validation-error" id={`${name}-field-error`} role="alert">{errorFor(name)}</small> : null
   const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setError(''); setBusy(true)
+    event.preventDefault(); setError(''); setFieldErrors({}); setBusy(true)
     const form = event.currentTarget
     const formData = new FormData(form)
     const base = { fullName: String(formData.get('fullName') || '').trim(), email: String(formData.get('email') || '').trim(), phone: String(formData.get('phone') || '').trim(), language: lang, consent: formData.get('consent') === 'on', website: String(formData.get('website') || '') }
@@ -34,19 +44,34 @@ function RequestForm({ lang, kind, course, sessions = [] }: { lang: Locale; kind
       else if (kind === 'quote') await apiSend('/quote-requests', 'POST', { ...base, serviceType: formData.get('serviceType'), projectDescription: formData.get('projectDescription'), budgetRange: formData.get('budgetRange'), desiredDeadline: formData.get('desiredDeadline') })
       else await apiSend('/enrollments', 'POST', { fullName: base.fullName, email: base.email, phone: base.phone, preferredLanguage: lang, consent: base.consent, website: base.website, sessionId: formData.get('sessionId') })
       setSent(true); form.reset()
-    } catch (reason) { setError(reason instanceof ApiError ? `${reason.message}${Object.values(reason.fields).length ? ` ${Object.values(reason.fields).join(' ')}` : ''}` : 'Le serveur est injoignable. Réessayez plus tard.') }
+    } catch (reason) {
+      if (reason instanceof ApiError && Object.keys(reason.fields).length) {
+        const fields = ['fullName', 'email', 'phone', 'consent', ...(kind === 'contact' ? ['subject', 'message'] : kind === 'quote' ? ['serviceType', 'projectDescription', 'budgetRange', 'desiredDeadline'] : ['sessionId'])]
+        const mapped = mapFieldErrors(reason.fields, fields)
+        setFieldErrors(mapped)
+        if (Object.keys(mapped).length < Object.keys(reason.fields).length) setError(reason.message)
+        const firstField = fields.find((name) => mapped[name])
+        if (firstField) requestAnimationFrame(() => {
+          const target = form.elements.namedItem(firstField)
+          if (target instanceof HTMLElement) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            target.focus({ preventScroll: true })
+          }
+        })
+      } else setError(reason instanceof ApiError ? reason.message : 'Le serveur est injoignable. Réessayez plus tard.')
+    }
     finally { setBusy(false) }
   }
   const heading = kind === 'quote' ? (lang === 'fr' ? 'Demander un devis' : 'Request a quote') : kind === 'registration' ? (lang === 'fr' ? 'Pré-inscription' : 'Pre-registration') : (lang === 'fr' ? 'Écrivez-nous' : 'Contact us')
   if (sent) return <div className="request-card form-success-card" role="status"><span aria-hidden="true">✓</span><h2>{lang === 'fr' ? 'Demande envoyée' : 'Request sent'}</h2><p>{kind === 'registration' ? (lang === 'fr' ? 'Votre pré-inscription est reçue. Notre équipe vous contactera pour confirmer la place. Aucun paiement en ligne n’est demandé.' : 'Your pre-registration was received. Our team will contact you to confirm your place. No online payment is required.') : (lang === 'fr' ? 'Merci. Votre demande a été transmise à notre équipe.' : 'Thank you. Your request has been sent to our team.')}</p><button className="text-action" type="button" onClick={() => setSent(false)}>{lang === 'fr' ? 'Envoyer une autre demande' : 'Send another request'}</button></div>
-  return <div className="request-card"><div className="request-card-heading"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h2>{heading}</h2></div><form className="public-form" onSubmit={(event) => void submit(event)}>
-    <label>{lang === 'fr' ? 'Nom complet' : 'Full name'}<input name="fullName" autoComplete="name" minLength={2} maxLength={160} required/></label>
-    <div className="form-two-columns"><label>E-mail<input type="email" name="email" autoComplete="email" maxLength={254} required/></label><label>{lang === 'fr' ? 'Téléphone' : 'Phone'}<input name="phone" type="tel" autoComplete="tel" maxLength={40}/></label></div>
-    {kind === 'contact' && <><label>{lang === 'fr' ? 'Objet' : 'Subject'}<input name="subject" maxLength={180} required/></label><label>{lang === 'fr' ? 'Votre message' : 'Your message'}<textarea name="message" rows={5} minLength={10} maxLength={12000} required/></label></>}
-    {kind === 'quote' && <><label>{lang === 'fr' ? 'Type de service' : 'Service type'}<input name="serviceType" maxLength={100} required/></label><label>{lang === 'fr' ? 'Décrivez votre besoin' : 'Describe your needs'}<textarea name="projectDescription" rows={5} minLength={15} maxLength={16000} required/></label><div className="form-two-columns"><label>{lang === 'fr' ? 'Budget indicatif' : 'Estimated budget'}<input name="budgetRange" maxLength={100}/></label><label>{lang === 'fr' ? 'Délai souhaité' : 'Desired timeline'}<input name="desiredDeadline" maxLength={160}/></label></div></>}
-    {kind === 'registration' && <><p>{course ? text(lang, course.titleFr, course.titleEn) : ''}</p><label>{lang === 'fr' ? 'Session' : 'Session'}<select name="sessionId" required defaultValue=""><option value="" disabled>{lang === 'fr' ? 'Choisir une session ouverte' : 'Choose an open session'}</option>{sessions.filter((session) => session.status === 'OPEN').map((session) => <option value={session.id} key={session.id}>{new Date(session.startsAt).toLocaleString(lang)} · {session.venue} · {session.placesRemaining} {lang === 'fr' ? 'places restantes' : 'places left'}</option>)}</select></label>{!sessions.some((session) => session.status === 'OPEN') && <p>{lang === 'fr' ? 'Aucune session ouverte actuellement. Contactez-nous pour être informé des prochaines dates.' : 'There is no open session at the moment. Contact us about upcoming dates.'}</p>}</>}
+  return <div className="request-card"><div className="request-card-heading"><p className="eyebrow">NOVA-TECH-SOLUTION <i/></p><h2>{heading}</h2></div><form className="public-form" onSubmit={(event) => void submit(event)} noValidate>
+    <label className={errorFor('fullName') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Nom complet' : 'Full name'}<input name="fullName" autoComplete="name" minLength={2} maxLength={160} required {...fieldProps('fullName')} onChange={() => clearFieldError('fullName')}/>{fieldMessage('fullName')}</label>
+    <div className="form-two-columns"><label className={errorFor('email') ? 'field-has-error' : ''}>E-mail<input type="email" name="email" autoComplete="email" maxLength={254} required {...fieldProps('email')} onChange={() => clearFieldError('email')}/>{fieldMessage('email')}</label><label className={errorFor('phone') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Téléphone' : 'Phone'}<input name="phone" type="tel" autoComplete="tel" maxLength={40} {...fieldProps('phone')} onChange={() => clearFieldError('phone')}/>{fieldMessage('phone')}</label></div>
+    {kind === 'contact' && <><label className={errorFor('subject') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Objet' : 'Subject'}<input name="subject" maxLength={180} required {...fieldProps('subject')} onChange={() => clearFieldError('subject')}/>{fieldMessage('subject')}</label><label className={errorFor('message') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Votre message' : 'Your message'}<textarea name="message" rows={5} minLength={10} maxLength={12000} required {...fieldProps('message')} onChange={() => clearFieldError('message')}/>{fieldMessage('message')}</label></>}
+    {kind === 'quote' && <><label className={errorFor('serviceType') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Type de service' : 'Service type'}<input name="serviceType" maxLength={100} required {...fieldProps('serviceType')} onChange={() => clearFieldError('serviceType')}/>{fieldMessage('serviceType')}</label><label className={errorFor('projectDescription') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Décrivez votre besoin' : 'Describe your needs'}<textarea name="projectDescription" rows={5} minLength={15} maxLength={16000} required {...fieldProps('projectDescription')} onChange={() => clearFieldError('projectDescription')}/>{fieldMessage('projectDescription')}</label><div className="form-two-columns"><label className={errorFor('budgetRange') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Budget indicatif' : 'Estimated budget'}<input name="budgetRange" maxLength={100} {...fieldProps('budgetRange')} onChange={() => clearFieldError('budgetRange')}/>{fieldMessage('budgetRange')}</label><label className={errorFor('desiredDeadline') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Délai souhaité' : 'Desired timeline'}<input name="desiredDeadline" maxLength={160} {...fieldProps('desiredDeadline')} onChange={() => clearFieldError('desiredDeadline')}/>{fieldMessage('desiredDeadline')}</label></div></>}
+    {kind === 'registration' && <><p>{course ? text(lang, course.titleFr, course.titleEn) : ''}</p><label className={errorFor('sessionId') ? 'field-has-error' : ''}>{lang === 'fr' ? 'Session' : 'Session'}<select name="sessionId" required defaultValue="" {...fieldProps('sessionId')} onChange={() => clearFieldError('sessionId')}><option value="" disabled>{lang === 'fr' ? 'Choisir une session ouverte' : 'Choose an open session'}</option>{sessions.filter((session) => session.status === 'OPEN').map((session) => <option value={session.id} key={session.id}>{new Date(session.startsAt).toLocaleString(lang)} · {session.venue} · {session.placesRemaining} {lang === 'fr' ? 'places restantes' : 'places left'}</option>)}</select>{fieldMessage('sessionId')}</label>{!sessions.some((session) => session.status === 'OPEN') && <p>{lang === 'fr' ? 'Aucune session ouverte actuellement. Contactez-nous pour être informé des prochaines dates.' : 'There is no open session at the moment. Contact us about upcoming dates.'}</p>}</>}
     <label className="honeypot" aria-hidden="true">Website<input name="website" tabIndex={-1} autoComplete="off"/></label>
-    <label className="consent-label"><input type="checkbox" name="consent" required/><span>{lang === 'fr' ? 'J’accepte que mes informations soient utilisées pour traiter ma demande.' : 'I agree that my information may be used to process my request.'} <Link to={publicPath(lang, 'privacy')}>{lang === 'fr' ? 'Politique de confidentialité' : 'Privacy policy'}</Link>.</span></label>
+    <label className={`consent-label${errorFor('consent') ? ' field-has-error' : ''}`}><input type="checkbox" name="consent" required {...fieldProps('consent')} onChange={() => clearFieldError('consent')}/><span>{lang === 'fr' ? 'J’accepte que mes informations soient utilisées pour traiter ma demande.' : 'I agree that my information may be used to process my request.'} <Link to={publicPath(lang, 'privacy')}>{lang === 'fr' ? 'Politique de confidentialité' : 'Privacy policy'}</Link>.</span>{fieldMessage('consent')}</label>
     <ErrorMessage value={error}/><button className="primary-action" type="submit" disabled={busy || (kind === 'registration' && !sessions.some((session) => session.status === 'OPEN'))}>{busy ? (lang === 'fr' ? 'Envoi…' : 'Sending…') : (lang === 'fr' ? 'Envoyer' : 'Send')} <span aria-hidden="true">→</span></button>
   </form></div>
 }

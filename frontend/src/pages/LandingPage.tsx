@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { motion, useReducedMotion } from 'motion/react'
 import { useLandingAnimations } from '../animations/useLandingAnimations'
 import { homepageDefaults } from '../data/homepageContent'
-import { ApiError, apiMediaUrl, apiSend } from '../api/client'
+import { ApiError, apiMediaUrl, apiSend, mapFieldErrors } from '../api/client'
 import type { ArticleRecord, ProjectRecord, ServiceRecord, TeamRecord, TestimonialRecord, TrainingRecord } from '../api/types'
 import { useApiData } from '../api/hooks'
 import novaTechLogo from '../assets/nova-tech-logo.png'
@@ -35,9 +35,17 @@ function LandingPage() {
   const [activeTab, setActiveTab] = useState('2')
   const [contactSent, setContactSent] = useState(false)
   const [contactError, setContactError] = useState('')
+  const [contactFieldErrors, setContactFieldErrors] = useState<Record<string, string>>({})
   const [sendingContact, setSendingContact] = useState(false)
   const homeText = (key: string) => settings?.[`home.${key}.${lang}`]?.trim() || homepageDefaults[`home.${key}.${lang}`] || ''
   const homeImage = (key: string, fallback = '') => { const value = settings?.[`home.${key}`] || homepageDefaults[`home.${key}`] || fallback; return value.startsWith('/media/') ? apiMediaUrl(value) : value }
+  const clearContactFieldError = (name: string) => setContactFieldErrors((current) => {
+    if (!current[name]) return current
+    const next = { ...current }
+    delete next[name]
+    return next
+  })
+  const contactFieldMessage = (name: string) => contactFieldErrors[name] ? <small className="field-validation-error" id={`contact-${name}-error`} role="alert">{contactFieldErrors[name]}</small> : null
   const emailAddress = settings?.['contact.email'] || 'contact@novatech.cm'
   const address = settings?.['contact.address'] || (lang === 'fr' ? 'Cameroun' : 'Cameroon')
   const phone = settings?.['contact.phone'] || ''
@@ -52,6 +60,7 @@ function LandingPage() {
   const sendContact = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setContactError('')
+    setContactFieldErrors({})
     setSendingContact(true)
     const form = event.currentTarget
     const values = new FormData(form)
@@ -69,7 +78,22 @@ function LandingPage() {
       setContactSent(true)
       form.reset()
     } catch (reason) {
-      setContactError(reason instanceof ApiError ? reason.message : (lang === 'fr' ? 'Message impossible à envoyer pour le moment.' : 'Unable to send your message right now.'))
+      if (reason instanceof ApiError && Object.keys(reason.fields).length) {
+        const mapped = mapFieldErrors(reason.fields, ['fullName', 'email', 'phone', 'message', 'consent'])
+        const visible: Record<string, string> = { email: mapped.email, phone: mapped.phone, message: mapped.message, consent: mapped.consent }
+        if (mapped.fullName) visible.name = mapped.fullName
+        for (const key of Object.keys(visible)) if (!visible[key]) delete visible[key]
+        setContactFieldErrors(visible)
+        if (Object.keys(visible).length < Object.keys(reason.fields).length) setContactError(reason.message)
+        const firstField = ['name', 'email', 'phone', 'message', 'consent'].find((field) => visible[field])
+        if (firstField) requestAnimationFrame(() => {
+          const target = form.elements.namedItem(firstField)
+          if (target instanceof HTMLElement) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            target.focus({ preventScroll: true })
+          }
+        })
+      } else setContactError(reason instanceof ApiError ? reason.message : 'Unable to send your message right now.')
     } finally {
       setSendingContact(false)
     }
@@ -125,7 +149,7 @@ function LandingPage() {
       <section className="why-section"><div className="why-inner"><div className="why-visual"><span className="why-word">NOVA</span><img className="why-photo-one" src={homeImage('why.image')} alt={homeText('why.title')}/><img className="why-photo-two" src={homeImage('why.imageSecondary')} alt={homeText('why.title')}/><span className="why-emblem">N</span><span className="why-photo-line"/></div><div className="why-copy"><p className="eyebrow">{homeText('why.eyebrow')}</p><h2>{homeText('why.title')}</h2><p className="muted">{homeText('why.body')}</p><blockquote>{homeText('why.quote')}</blockquote><div className="why-actions"><a className="button" href="#contact">{homeText('why.cta')}</a><div className="founder">{teamRecords?.[0]?.photoUrl && <img src={apiMediaUrl(teamRecords[0].photoUrl)} alt={teamRecords[0].fullName}/>}<span><b>{teamRecords?.[0]?.fullName || homeText('why.founderName')}</b><small>{teamRecords?.[0] ? (lang === 'fr' ? teamRecords[0].positionFr : teamRecords[0].positionEn) : homeText('why.founderRole')}</small></span></div></div></div></div></section>
 
       <section className="mission-section"><div className="mission-dark"><div className="mission-stats">{[1, 2, 3, 4].map((index) => <article className="mission-stat" key={index}><span className="mission-stat-icon"><span>{index}</span></span><strong>{settings?.[`home.stats.stat${index}.value`] || homepageDefaults[`home.stats.stat${index}.value`]}</strong><small>{homeText(`stats.stat${index}.label`)}</small></article>)}</div><div className="mission-tabs">{[1, 2, 3].map((index) => <button key={index} className={`mission-tab${activeTab === String(index) ? ' is-active' : ''}`} onClick={() => setActiveTab(String(index))}>{homeText(`mission.tab${index}`)}</button>)}</div></div><div className="mission-light"><div className="mission-card"><div className="mission-benefits"><article className="mission-benefit"><div><h3>{homeText('mission.benefit1.title')}</h3><p>{homeText('mission.benefit1.body')}</p></div></article><article className="mission-benefit"><div><h3>{homeText('mission.benefit2.title')}</h3><p>{homeText('mission.benefit2.body')}</p></div></article></div><div className="mission-experience"><span className="mini-rule"/><h3>{homeText(`mission.content${activeTab}`)}</h3><a href="#about">{homeText('mission.readMore')} <span>&rsaquo;</span></a></div><div className="mission-photo"><img src={homeImage('mission.image')} alt={homeText('mission.experience')}/></div></div></div></section>
-      <section className="contact-vision" id="contact"><div className="contact-vision-inner"><form className="contact-form" onSubmit={(event) => void sendContact(event)}><p className="eyebrow">{homeText('contact.eyebrow')}</p><h2>{homeText('contact.title')}</h2><input type="text" name="name" placeholder={lang === 'fr' ? 'Votre nom complet' : 'Your full name'} autoComplete="name" required/><input type="email" name="email" placeholder={lang === 'fr' ? 'Adresse e-mail' : 'Email address'} autoComplete="email" required/><input type="tel" name="phone" placeholder={lang === 'fr' ? 'Telephone (facultatif)' : 'Phone (optional)'} autoComplete="tel"/><textarea name="message" placeholder={lang === 'fr' ? 'Decrivez votre besoin' : 'Tell us what you need'} rows={4} minLength={10} required/><input className="contact-honeypot" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><label className="contact-consent"><input type="checkbox" name="consent" required/><span>{lang === 'fr' ? 'J accepte que mes informations soient utilisees pour repondre a ma demande.' : 'I agree that my information may be used to respond to my request.'}</span></label><button className="button" type="submit" disabled={sendingContact}>{sendingContact ? (lang === 'fr' ? 'Envoi en cours...' : 'Sending...') : (lang === 'fr' ? 'Envoyer le message' : 'Send message')} <span>&rsaquo;</span></button>{contactError && <p className="form-error" role="alert">{contactError}</p>}{contactSent && <p className="form-success" role="status">{lang === 'fr' ? 'Merci. Votre message a bien ete enregistre.' : 'Thank you. Your message has been recorded.'}</p>}</form><img className="vision-portrait" src={homeImage('contact.image')} alt={homeText('vision.title')}/><div className="vision-copy"><p className="eyebrow">{homeText('vision.eyebrow')}</p><h2>{homeText('vision.title')}</h2>{[1,2,3].map((index) => <p className="vision-check" key={index}><span>&rsaquo;</span><b>{homeText(`vision.point${index}`)}</b></p>)}</div></div></section>
+      <section className="contact-vision" id="contact"><div className="contact-vision-inner"><form className="contact-form" onSubmit={(event) => void sendContact(event)} noValidate><p className="eyebrow">{homeText('contact.eyebrow')}</p><h2>{homeText('contact.title')}</h2><input type="text" name="name" aria-invalid={Boolean(contactFieldErrors.name)} aria-describedby={contactFieldErrors.name ? 'contact-name-error' : undefined} onChange={() => clearContactFieldError('name')} placeholder={lang === 'fr' ? 'Votre nom complet' : 'Your full name'} autoComplete="name" required/>{contactFieldMessage('name')}<input type="email" name="email" aria-invalid={Boolean(contactFieldErrors.email)} aria-describedby={contactFieldErrors.email ? 'contact-email-error' : undefined} onChange={() => clearContactFieldError('email')} placeholder={lang === 'fr' ? 'Adresse e-mail' : 'Email address'} autoComplete="email" required/>{contactFieldMessage('email')}<input type="tel" name="phone" aria-invalid={Boolean(contactFieldErrors.phone)} aria-describedby={contactFieldErrors.phone ? 'contact-phone-error' : undefined} onChange={() => clearContactFieldError('phone')} placeholder={lang === 'fr' ? 'Telephone (facultatif)' : 'Phone (optional)'} autoComplete="tel"/>{contactFieldMessage('phone')}<textarea name="message" aria-invalid={Boolean(contactFieldErrors.message)} aria-describedby={contactFieldErrors.message ? 'contact-message-error' : undefined} onChange={() => clearContactFieldError('message')} placeholder={lang === 'fr' ? 'Decrivez votre besoin' : 'Tell us what you need'} rows={4} minLength={10} required/>{contactFieldMessage('message')}<input className="contact-honeypot" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"/><label className="contact-consent"><input type="checkbox" name="consent" required aria-invalid={Boolean(contactFieldErrors.consent)} aria-describedby={contactFieldErrors.consent ? 'contact-consent-error' : undefined} onChange={() => clearContactFieldError('consent')}/><span>{lang === 'fr' ? 'J accepte que mes informations soient utilisees pour repondre a ma demande.' : 'I agree that my information may be used to respond to my request.'}</span>{contactFieldMessage('consent')}</label><button className="button" type="submit" disabled={sendingContact}>{sendingContact ? (lang === 'fr' ? 'Envoi en cours...' : 'Sending...') : (lang === 'fr' ? 'Envoyer le message' : 'Send message')} <span>&rsaquo;</span></button>{contactError && <p className="form-error" role="alert">{contactError}</p>}{contactSent && <p className="form-success" role="status">{lang === 'fr' ? 'Merci. Votre message a bien ete enregistre.' : 'Thank you. Your message has been recorded.'}</p>}</form><img className="vision-portrait" src={homeImage('contact.image')} alt={homeText('vision.title')}/><div className="vision-copy"><p className="eyebrow">{homeText('vision.eyebrow')}</p><h2>{homeText('vision.title')}</h2>{[1,2,3].map((index) => <p className="vision-check" key={index}><span>&rsaquo;</span><b>{homeText(`vision.point${index}`)}</b></p>)}</div></div></section>
 
       <section className="news-section" id="news"><div className="news-service-promos">{[1,2].map((index) => <a className="news-promo" href="#services" key={index}><span className="promo-icon">&#10022;</span><span><b>{homeText(`news.promo${index}.title`)}</b><small>{homeText(`news.promo${index}.body`)}</small></span></a>)}</div><div className="container"><div className="news-heading"><p className="eyebrow light">{homeText('news.eyebrow')}</p><h2>{homeText('news.title')}</h2></div><div className="news-grid">{(articleRecords || []).slice(0, 3).map((post) => <article className="news-card" key={post.id}><Link to={`/${lang}/${lang === 'fr' ? 'actualites' : 'news'}/${post.slug}`} className="news-image"><img src={apiMediaUrl(post.coverImageUrl)} alt={lang === 'fr' ? post.titleFr : post.titleEn}/><span className="image-hover-wash" aria-hidden="true"/><span>{post.publishedAt ? new Date(post.publishedAt).getDate() : ''}<br/><small>{post.publishedAt ? new Date(post.publishedAt).toLocaleString(lang, { month: 'short' }).toUpperCase() : ''}</small></span></Link><div className="news-content"><p className="meta">{post.category}</p><h3><Link to={`/${lang}/${lang === 'fr' ? 'actualites' : 'news'}/${post.slug}`}>{lang === 'fr' ? post.titleFr : post.titleEn}</Link></h3><Link className="read-more" to={`/${lang}/${lang === 'fr' ? 'actualites' : 'news'}/${post.slug}`}>{t('common.readMore')} <span>&rsaquo;</span></Link></div></article>)}</div></div></section>
 

@@ -27,6 +27,21 @@ export class ApiError extends Error {
   }
 }
 
+export function mapFieldErrors(fields: Record<string, string>, fieldNames: string[]): Record<string, string> {
+  const mapped: Record<string, string> = {}
+  const names = [...fieldNames].sort((left, right) => right.length - left.length)
+  for (const [path, message] of Object.entries(fields)) {
+    const name = names.find((candidate) => path === candidate
+      || path.startsWith(`${candidate}[`)
+      || path.startsWith(`${candidate}.`)
+      || path === `values[${candidate}]`
+      || path.startsWith(`values[${candidate}].`)
+      || path.startsWith(`values.${candidate}`))
+    if (name) mapped[name] = message
+  }
+  return mapped
+}
+
 const ACCESS_TOKEN_KEY = 'nova-api-access'
 const REFRESH_TOKEN_KEY = 'nova-api-refresh'
 const SESSION_KEY = 'nova-api-user'

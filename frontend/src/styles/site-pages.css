@@ -55,3 +55,6 @@
 .home-language{display:inline-flex;align-items:center;gap:5px;margin-left:8px;color:#d7dce6;font-size:10px;font-weight:800}.home-language a{color:inherit!important}.home-language a[aria-current=page]{color:#8bb2ff!important}
 @media(max-width:1050px){.media-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-language{padding:8px 0}.navbar .nav-links.nav-open a{color:#f3f5fa}.navbar .nav-links.nav-open .selected{color:#8bb2ff}}
+.field-validation-error { display:block; margin-top:4px; color:#b42318; font-size:12px; font-weight:650; line-height:1.45; }
+.field-has-error input:not([type='checkbox']),.field-has-error textarea,.field-has-error select,[aria-invalid='true'] { border-color:#d92d20 !important; background-color:#fffafa; }
+.field-has-error input:focus,.field-has-error textarea:focus,.field-has-error select:focus { box-shadow:0 0 0 3px #d92d2020; }
