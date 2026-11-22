@@ -7,5 +7,4 @@ import java.util.UUID;
 
 public interface QuoteRequestRepository extends JpaRepository<QuoteRequest, UUID> {
     List<QuoteRequest> findAllByOrderByCreatedAtDesc();
-    long countByStatus(com.novatechsolution.inquiries.domain.InquiryStatus status);
 }

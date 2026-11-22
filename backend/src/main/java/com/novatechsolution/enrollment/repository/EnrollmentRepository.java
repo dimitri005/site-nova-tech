@@ -7,5 +7,4 @@ import java.util.UUID;
 
 public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     List<Enrollment> findAllBySessionIdOrderByCreatedAtDesc(UUID sessionId);
-    long countByCreatedAtAfter(java.time.Instant after);
 }

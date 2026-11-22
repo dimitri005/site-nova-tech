@@ -15,7 +15,7 @@ public class ActivityAuditFilter extends OncePerRequestFilter {
     private final ActivityLogService logs;
     @Override protected boolean shouldNotFilter(HttpServletRequest request){
         String method=request.getMethod();
-        return !request.getRequestURI().startsWith(request.getContextPath()+"/api/v1/admin/")
+        return !request.getRequestURI().startsWith(request.getContextPath()+"/api/v1/management/")
                 || !("POST".equals(method)||"PUT".equals(method)||"PATCH".equals(method)||"DELETE".equals(method));
     }
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)throws ServletException,IOException{

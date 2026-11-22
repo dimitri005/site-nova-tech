@@ -31,3 +31,15 @@ Le profil `dev` met à jour le schéma automatiquement. En production, activer `
 - Les formations sont en présentiel et n'ont pas de paiement en ligne.
 
 Les contrôleurs et services métier du module `student` n'appartiennent pas à NovaTech. Le dossier est conservé intact comme référence de style et exclu de la compilation du projet.
+
+## Documentation de l'API
+
+Swagger UI : `http://localhost:8081/swagger-ui.html` (spécification brute : `/v3/api-docs`). Toutes les routes sont listées sur une seule page, groupées par tag.
+
+Les routes sont documentées en **v1**. Chaque tag indique l’acteur puis la fonction technique, selon trois familles :
+
+| Famille | Préfixe | Acteur |
+|---|---|---|
+| Visiteur | `/api/v1/*` | Visiteur du site, sans authentification |
+| Authentification | `/api/v1/auth/*` | Équipe NovaTech (connexion, renouvellement, déconnexion) |
+| Management | `/api/v1/management/*` | Administrateur ou éditeur (jeton Bearer, rôles `SUPER_ADMIN` / `EDITOR`) |

@@ -8,6 +8,16 @@ type ApiDataState<T> = {
   loading: boolean
 }
 
+/** Requêtes GET identiques simultanées : une seule requête réseau partagée (ex. réglages publics demandés par plusieurs composants). */
+const inflight = new Map<string, Promise<unknown>>()
+function sharedGet<T>(path: string): Promise<T> {
+  const existing = inflight.get(path)
+  if (existing) return existing as Promise<T>
+  const request = apiGet<T>(path).finally(() => inflight.delete(path))
+  inflight.set(path, request)
+  return request
+}
+
 export function useApiData<T>(path: string | null) {
   const [revision, setRevision] = useState(0)
   const requestKey = path === null ? null : JSON.stringify([path, revision])
@@ -22,7 +32,7 @@ export function useApiData<T>(path: string | null) {
     if (path === null || requestKey === null) return
 
     const controller = new AbortController()
-    apiGet<T>(path, controller.signal)
+    sharedGet<T>(path)
       .then((result) => {
         if (!controller.signal.aborted) {
           setState({ requestKey, data: result, error: '', loading: false })

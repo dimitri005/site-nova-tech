@@ -30,7 +30,7 @@ Les répertoires `event` et `mapper` restent disponibles lorsque le domaine en a
 - Lecture publique : `GET /services`, `/projects`, `/trainings`, `/trainings/{slug}/sessions`, `/team`, `/testimonials`, `/partners`, `/articles` et `/site-content/pages`.
 - Formulaires : `POST /contact-messages`, `/quote-requests` et `/enrollments`.
 - Authentification : `POST /auth/login`, `/auth/refresh` et `/auth/logout`.
-- Gestion : CRUD sous `/api/v1/admin/**`; les comptes sont réservés à `SUPER_ADMIN`, les contenus à `SUPER_ADMIN` ou `EDITOR`.
+- Gestion : CRUD sous `/api/v1/management/**`; les comptes sont réservés à `SUPER_ADMIN`, les contenus à `SUPER_ADMIN` ou `EDITOR`.
 - Documentation : Swagger UI sous `/swagger-ui.html`, OpenAPI sous `/v3/api-docs`.
 
 Les pages publiques ne retournent que les contenus publiés. Les textes éditoriaux disposent de champs FR et EN distincts. Les formations restent en présentiel; aucun paiement n'est implémenté.

@@ -83,3 +83,16 @@ export interface NewsletterRecord { id: string; email: string; active: boolean; 
 export interface ActivityRecord {
   id: string; actorEmail: string; method: string; path: string; responseStatus: number; createdAt: string
 }
+
+export interface AnalyticsTotals { messages: number; quotes: number; enrollments: number; subscribers: number }
+export interface AnalyticsPoint extends AnalyticsTotals { date: string }
+export interface AnalyticsSlice { label: string; value: number }
+export interface AnalyticsFill { label: string; reserved: number; capacity: number }
+export interface DashboardAnalyticsRecord {
+  days: number; from: string; to: string
+  totals: AnalyticsTotals; previousTotals: AnalyticsTotals
+  series: AnalyticsPoint[]
+  quoteStatus: AnalyticsSlice[]; messageStatus: AnalyticsSlice[]
+  quotesByService: AnalyticsSlice[]; enrollmentsByCourse: AnalyticsSlice[]
+  sessionFill: AnalyticsFill[]
+}

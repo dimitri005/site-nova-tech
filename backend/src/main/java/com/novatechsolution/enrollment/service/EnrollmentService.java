@@ -36,9 +36,6 @@ public class EnrollmentService {
     }
 
     @Transactional(readOnly = true) public List<Enrollment> forSession(UUID sessionId) { return enrollments.findAllBySessionIdOrderByCreatedAtDesc(sessionId); }
-    @Transactional(readOnly = true)
-    public long recentCount() { return enrollments.countByCreatedAtAfter(Instant.now().minusSeconds(7 * 24 * 60 * 60L)); }
-
     @Transactional
     public Enrollment changeStatus(UUID id, EnrollmentStatus newStatus) {
         Enrollment enrollment = enrollments.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pré-inscription introuvable."));

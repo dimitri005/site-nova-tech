@@ -22,7 +22,6 @@ public class ArticleService {
     @Transactional(readOnly=true) public List<Article> publicList(){return articles.findAllByStatusOrderByPublishedAtDesc(ArticleStatus.PUBLISHED);}
     @Transactional(readOnly=true) public Article publicFind(String slug){return articles.findBySlugAndStatus(slug,ArticleStatus.PUBLISHED).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Article introuvable."));}
     @Transactional(readOnly=true) public List<Article> adminList(){return articles.findAllByOrderByCreatedAtDesc();}
-    @Transactional(readOnly=true) public long publishedCount(){return articles.countByPublishedTrue();}
     @Transactional public Article create(ArticleRequest r){Article a=new Article();apply(a,r);return articles.save(a);}
     @Transactional public Article update(UUID id,ArticleRequest r){Article a=articles.findById(id).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Article introuvable."));apply(a,r);return a;}
     @Transactional public void delete(UUID id){if(!articles.existsById(id))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Article introuvable.");articles.deleteById(id);}

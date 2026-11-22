@@ -20,3 +20,7 @@ npm-debug.log*
 .idea/
 .vscode/
 !.vscode/extensions.json
+
+# Config locale
+application-local.properties
+**/application-local.properties

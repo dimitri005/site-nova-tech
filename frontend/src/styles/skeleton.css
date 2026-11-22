@@ -1,0 +1,30 @@
+/* Squelettes de chargement (partagés : site public et administration) */
+.skeleton { display: block; background: linear-gradient(90deg, #e8edf5 25%, #f4f7fb 45%, #e8edf5 65%); background-size: 200% 100%; animation: skeleton-shimmer 1.3s ease-in-out infinite; border-radius: 8px; }
+@keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.sk-lines { display: grid; gap: 12px; padding: 8px 0; }
+.sk-lines .skeleton { height: 14px; }
+.sk-title { height: 28px !important; width: 55%; }
+.sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
+.sk-card { display: grid; gap: 14px; padding: 0 0 20px; border: 1px solid #e6ebf3; border-radius: 6px; background: #fff; overflow: hidden; }
+.sk-card .sk-image { height: 190px; border-radius: 0; }
+.sk-card .skeleton:not(.sk-image) { height: 14px; margin: 0 20px; }
+.sk-card .skeleton:nth-child(2) { height: 20px; width: 70%; }
+.sk-card .skeleton:last-child { width: 45%; }
+.sk-form { display: grid; gap: 20px; padding: 24px; }
+.sk-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.sk-field { display: grid; gap: 8px; }
+.sk-field .skeleton:first-child { width: 35%; height: 12px; }
+.sk-field .skeleton:last-child { height: 42px; }
+.sk-page { min-height: 100vh; background: #fff; }
+.sk-page-bar { display: flex; align-items: center; justify-content: space-between; gap: 24px; height: 76px; padding: 0 max(24px, calc((100vw - 1180px) / 2)); border-bottom: 1px solid #e9edf3; }
+.sk-page-bar .skeleton:first-child { width: 190px; height: 38px; }
+.sk-page-bar .skeleton:last-child { width: 38%; height: 16px; }
+.sk-page-hero { display: grid; gap: 16px; padding: 64px max(24px, calc((100vw - 1180px) / 2)) 40px; background: #f5f8fc; }
+.sk-page-hero .skeleton:nth-child(1) { width: 140px; height: 12px; }
+.sk-page-hero .skeleton:nth-child(2) { width: min(520px, 70%); height: 40px; }
+.sk-page-hero .skeleton:nth-child(3) { width: min(680px, 90%); height: 14px; }
+.sk-page-body { padding: 48px max(24px, calc((100vw - 1180px) / 2)); }
+.public-card-image img, .news-image img, .team-photo img, .project-card img { background: linear-gradient(90deg, #e8edf5 25%, #f4f7fb 45%, #e8edf5 65%); background-size: 200% 100%; }
+@media (max-width: 640px) { .sk-form-row { grid-template-columns: 1fr; } }
+.home-skeleton { width: 100%; border-radius: 6px; }
