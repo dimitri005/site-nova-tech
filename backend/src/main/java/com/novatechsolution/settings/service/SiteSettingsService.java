@@ -16,7 +16,7 @@ import java.util.Set;
 
 @Service @RequiredArgsConstructor
 public class SiteSettingsService {
-    private static final Set<String> PUBLIC_PREFIXES = Set.of("site.", "contact.", "social.", "footer.", "seo.", "home.");
+    private static final Set<String> PUBLIC_PREFIXES = Set.of("site.", "contact.", "social.", "footer.", "header.", "topbar.", "seo.", "home.");
     private final SiteSettingsRepository settings;
 
     @Transactional(readOnly = true)
@@ -41,7 +41,7 @@ public class SiteSettingsService {
         Map<String, String> merged = new LinkedHashMap<>(entity.getValues());
         SafeUrlValidator urlValidator = new SafeUrlValidator();
         request.values().forEach((key, value) -> {
-            if (key == null || !key.matches("home\\.[a-z0-9_.-]{1,154}") || value == null || value.length() > 4000)
+            if (key == null || !key.matches("home\\.[A-Za-z0-9_.-]{1,154}") || value == null || value.length() > 4000)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Contenu de la page d'accueil invalide.");
             if (key.contains(".image") && !urlValidator.isValid(value, null))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Une image doit utiliser HTTPS, HTTP ou le chemin local /media/.");
@@ -58,12 +58,14 @@ public class SiteSettingsService {
         return home;
     }
 
+    /** Remplace les paramètres du site ; le contenu de la page d'accueil (home.*) est conservé s'il n'est pas fourni. */
     @Transactional
     public Map<String, String> replace(SiteSettingsRequest request) {
         SiteSettings entity = settings.findById("default").orElseGet(SiteSettings::new);
         Map<String, String> cleaned = new LinkedHashMap<>();
+        entity.getValues().forEach((key, value) -> { if (key.startsWith("home.")) cleaned.put(key, value); });
         request.values().forEach((key, value) -> {
-            if (key == null || !key.matches("[a-z][a-z0-9_.-]{1,159}") || key.toLowerCase().matches(".*(password|secret|token|credential).*"))
+            if (key == null || !key.matches("[a-z][A-Za-z0-9_.-]{1,159}") || key.toLowerCase().matches(".*(password|secret|token|credential).*"))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Clé de paramètre invalide.");
             if (value == null || value.length() > 4000)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valeur de paramètre invalide.");

@@ -10,5 +10,4 @@ public interface TrainingCourseRepository extends JpaRepository<TrainingCourse, 
     List<TrainingCourse> findAllByPublishedTrueOrderByTitleFrAsc();
     List<TrainingCourse> findAllByOrderByTitleFrAsc();
     Optional<TrainingCourse> findBySlugAndPublishedTrue(String slug);
-    long countByPublishedTrue();
 }

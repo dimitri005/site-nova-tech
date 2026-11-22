@@ -26,32 +26,9 @@
 
 .service-card:hover { transform: translateY(-4px); }
 
-:is(.public-card-image, .team-photo, .project-image, .news-image, .why-photo-one, .why-photo-two, .vision-portrait) {
-  overflow: hidden;
-}
-
 :is(.public-card, .team-card, .project-card, .news-card, .news-promo, .about-visual, .why-visual, .vision-portrait, .mission-benefit):hover img {
   transform: scale(1.035);
   filter: brightness(1.025) saturate(1.035);
-}
-
-:is(.public-card-image, .team-photo, .project-image, .news-image)::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(145deg, rgba(50, 103, 237, .15), transparent 62%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 300ms ease;
-}
-
-:is(.public-card, .team-card, .project-card, .news-card, .news-promo):hover :is(.public-card-image, .team-photo, .project-image, .news-image)::after {
-  opacity: 1;
-}
-
-:is(.public-card-image, .team-photo, .project-image, .news-image) img {
-  transition: transform 550ms var(--nova-motion-ease), filter 400ms ease;
 }
 
 :is(.public-card, .service-card, .project-card, .news-card, .news-promo) .card-link b,
@@ -73,14 +50,6 @@
 .public-site a:hover,
 .admin-shell a:hover {
   text-decoration-color: currentColor;
-}
-
-:is(.service-icon, .card-icon, .admin-stat-card > span, .mission-stat > span, .feature-icon) {
-  animation: nova-gentle-float 5s ease-in-out infinite;
-}
-
-:is(.service-card, .public-card, .mission-stat, .admin-stat-card):nth-child(2n) :is(.service-icon, .card-icon, .admin-stat-card > span, .mission-stat > span, .feature-icon) {
-  animation-delay: -2.4s;
 }
 
 .inner-hero {

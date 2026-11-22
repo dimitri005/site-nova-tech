@@ -18,7 +18,6 @@ public class ProjectService {
     private final ProjectRepository projects;
     @Transactional(readOnly = true) public List<Project> publicList() { return projects.findAllByPublishedTrueOrderByProjectDateDesc(); }
     @Transactional(readOnly = true) public List<Project> adminList() { return projects.findAllByOrderByCreatedAtDesc(); }
-    @Transactional(readOnly = true) public long publishedCount() { return projects.countByPublishedTrue(); }
     @Transactional(readOnly = true) public Project publicFind(String slug) {
         return projects.findBySlugAndPublishedTrue(slug).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Réalisation introuvable."));
     }

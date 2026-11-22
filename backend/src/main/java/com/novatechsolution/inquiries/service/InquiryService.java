@@ -44,11 +44,6 @@ public class InquiryService {
 
     @Transactional(readOnly = true) public List<ContactMessage> messages() { return messages.findAllByOrderByCreatedAtDesc(); }
     @Transactional(readOnly = true) public List<QuoteRequest> quotes() { return quotes.findAllByOrderByCreatedAtDesc(); }
-    @Transactional(readOnly = true) public long unreadMessageCount() { return messages.countByStatus(InquiryStatus.NEW); }
-    @Transactional(readOnly = true) public long pendingQuoteCount() {
-        return quotes.countByStatus(InquiryStatus.NEW) + quotes.countByStatus(InquiryStatus.IN_PROGRESS);
-    }
-
     @Transactional
     public ContactMessage setMessageStatus(UUID id, InquiryStatusRequest r) {
         if (!java.util.Set.of(InquiryStatus.NEW, InquiryStatus.READ, InquiryStatus.RESOLVED).contains(r.status()))

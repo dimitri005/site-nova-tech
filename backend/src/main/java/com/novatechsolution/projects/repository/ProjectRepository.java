@@ -10,5 +10,4 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findAllByPublishedTrueOrderByProjectDateDesc();
     List<Project> findAllByOrderByCreatedAtDesc();
     Optional<Project> findBySlugAndPublishedTrue(String slug);
-    long countByPublishedTrue();
 }

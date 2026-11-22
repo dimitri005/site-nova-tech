@@ -49,6 +49,6 @@ La base PostgreSQL doit exister et être accessible. Les formulaires et l'admini
 - `/fr` et `/en` : accueil
 - `/:lang/a-propos`, `/:lang/services`, `/:lang/realisations`, `/:lang/formations`, `/:lang/equipe`
 - `/:lang/contact`, `/:lang/devis`, `/:lang/actualites`, `/:lang/mentions-legales`, `/:lang/confidentialite`
-- `/admin/login` et `/admin` : interface d’administration de démonstration
+- `/admin/login` et `/admin` : interface d’administration
 
 Les segments anglais équivalents sont également disponibles depuis la navigation bilingue.

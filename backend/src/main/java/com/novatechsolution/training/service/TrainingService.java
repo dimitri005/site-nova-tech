@@ -43,8 +43,6 @@ public class TrainingService {
     public void deleteCourse(UUID id) { if (!courses.existsById(id)) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Formation introuvable."); courses.deleteById(id); }
     @Transactional(readOnly = true)
     public List<TrainingSession> adminSessions(UUID courseId) { return sessions.findAllByCourseIdOrderByStartsAtAsc(courseId); }
-    @Transactional(readOnly = true)
-    public long publishedCourseCount() { return courses.countByPublishedTrue(); }
     @Transactional
     public SessionRegistration reservePlace(UUID id) {
         TrainingSession session = sessions.findByIdForUpdate(id)

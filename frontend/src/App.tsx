@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { PageSkeleton } from './components/Skeleton'
 import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/site-pages.css'
@@ -8,7 +9,7 @@ const LocalizedPage = lazy(() => import('./pages/PublicPages').then((module) => 
 const NewsletterUnsubscribe = lazy(() => import('./pages/PublicPages').then((module) => ({ default: module.NewsletterUnsubscribe })))
 
 function RouteFallback() {
-  return <div className="page-loading" role="status">NOVA-TECH-SOLUTION</div>
+  return <PageSkeleton/>
 }
 
 function RouteNotFound() {

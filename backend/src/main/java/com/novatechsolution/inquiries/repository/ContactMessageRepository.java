@@ -7,5 +7,4 @@ import java.util.UUID;
 
 public interface ContactMessageRepository extends JpaRepository<ContactMessage, UUID> {
     List<ContactMessage> findAllByOrderByCreatedAtDesc();
-    long countByStatus(com.novatechsolution.inquiries.domain.InquiryStatus status);
 }

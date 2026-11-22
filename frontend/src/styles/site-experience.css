@@ -1,5 +1,5 @@
 :root {
-  --nova-motion-blue: var(--blue, #235daf);
+  --nova-motion-blue: var(--blue, #3372b7);
   --nova-radius-sm: 8px;
   --nova-radius-md: 14px;
   --nova-shadow-card: 0 10px 28px rgba(17, 34, 65, .07);
@@ -13,7 +13,7 @@ html { scroll-behavior: smooth; }
 }
 
 :where(.public-site, #top) :where(a, button, input, select, textarea):focus-visible {
-  outline: 3px solid rgba(35, 93, 175, .35);
+  outline: 3px solid rgba(51, 114, 183, .35);
   outline-offset: 3px;
 }
 
@@ -73,7 +73,7 @@ html { scroll-behavior: smooth; }
 #top .button:hover,
 #top .home-quote:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(35, 93, 175, .2);
+  box-shadow: 0 10px 22px rgba(51, 114, 183, .2);
 }
 
 .public-site .secondary-action:hover {
@@ -149,25 +149,19 @@ html { scroll-behavior: smooth; }
 .public-site .public-form input:not([type='checkbox']),
 .public-site .public-form textarea,
 .public-site .public-form select,
-.public-site .subscribe input,
 #top .contact-form input:not([type='checkbox']):not(.contact-honeypot),
-#top .contact-form textarea,
-#top .subscribe input:not([type='checkbox']) {
+#top .contact-form textarea {
   border-radius: var(--nova-radius-sm);
   transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
 }
 
-.public-site .public-form :where(input, textarea, select):focus,
-.public-site .subscribe input:focus,
-#top .contact-form :where(input, textarea):focus,
-#top .subscribe input:focus {
+.public-site .public-form :where(input, textarea, select):focus, #top .contact-form :where(input, textarea):focus {
   border-color: #5b8dce;
-  box-shadow: 0 0 0 4px rgba(35, 93, 175, .1);
+  box-shadow: 0 0 0 4px rgba(51, 114, 183, .1);
   outline: 0;
 }
 
 .public-site .request-card,
-.public-site .newsletter-card,
 .public-site .contact-aside {
   border-radius: var(--nova-radius-md);
 }

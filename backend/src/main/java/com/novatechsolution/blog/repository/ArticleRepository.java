@@ -10,6 +10,4 @@ public interface ArticleRepository extends JpaRepository<Article, UUID> {
     List<Article> findAllByStatusOrderByPublishedAtDesc(com.novatechsolution.blog.domain.ArticleStatus status);
     List<Article> findAllByOrderByCreatedAtDesc();
     Optional<Article> findBySlugAndStatus(String slug, com.novatechsolution.blog.domain.ArticleStatus status);
-    long countByStatus(com.novatechsolution.blog.domain.ArticleStatus status);
-    default long countByPublishedTrue() { return countByStatus(com.novatechsolution.blog.domain.ArticleStatus.PUBLISHED); }
 }
