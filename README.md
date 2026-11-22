@@ -52,3 +52,7 @@ La base PostgreSQL doit exister et être accessible. Les formulaires et l'admini
 - `/admin/login` et `/admin` : interface d’administration
 
 Les segments anglais équivalents sont également disponibles depuis la navigation bilingue.
+
+## Décisions d'architecture
+
+Les choix structurants du projet sont consignés dans [docs/adr](docs/adr/README.md) (Architecture Decision Records).
