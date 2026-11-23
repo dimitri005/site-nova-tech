@@ -558,10 +558,11 @@ function EnrollmentManager() {
     { key: 'createdAt', header: 'Reçue le', type: 'date', value: (row) => row.createdAt, render: (row) => formatDate(row.createdAt) },
     { key: 'status', header: 'Statut', type: 'select', options: statusOptions(['PENDING', 'CONFIRMED', 'CANCELLED']), value: (row) => row.status, render: (row) => <select className="status-select" value={row.status} aria-label={`Statut ${row.fullName}`} onChange={(event) => void changeStatus(row, event.target.value)}>{['PENDING', 'CONFIRMED', 'CANCELLED'].map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select> },
   ]
-  const exportCsv = async () => { try { await adminApiExport(selectedSession) } catch (reason) { toast.error(reason instanceof ApiError ? reason.message : 'Export impossible.') } }
+  const exportCsv = async () => { try { await adminApiExport(selectedSession, 'csv') } catch (reason) { toast.error(reason instanceof ApiError ? reason.message : 'Export impossible.') } }
+  const exportExcel = async () => { try { await adminApiExport(selectedSession, 'xlsx') } catch (reason) { toast.error(reason instanceof ApiError ? reason.message : 'Export impossible.') } }
   return <>
     <PageHeader eyebrow="INSCRIPTIONS" title="Pré-inscriptions" description="Le statut synchronise les places disponibles de la session."
-      actions={<button className="secondary-action" disabled={!selectedSession} onClick={() => void exportCsv()}>Exporter en CSV</button>}/>
+      actions={<><button className="secondary-action" disabled={!selectedSession} onClick={() => void exportCsv()}>Exporter en CSV</button><button className="secondary-action" disabled={!selectedSession} onClick={() => void exportExcel()}>Exporter en Excel</button></>}/>
     <ApiState loading={false} error={courseError || error}/>
     <DataGrid id="enrollments" rows={data ?? NO_ROWS} columns={columns} loading={courseLoading || loading} rowKey={(row) => row.id} noun={['inscription', 'inscriptions']}
       searchPlaceholder="Rechercher un nom ou un e-mail…" emptyTitle="Aucune pré-inscription" emptyText="Aucune inscription pour cette session." defaultSort={{ key: 'createdAt', dir: 'desc' }}
@@ -570,8 +571,10 @@ function EnrollmentManager() {
   </>
 }
 
-async function adminApiExport(sessionId: string) {
-  await apiDownload(`/management/enrollments/export?sessionId=${encodeURIComponent(sessionId)}`, `pre-inscriptions-${sessionId}.csv`)
+async function adminApiExport(sessionId: string, format: 'csv' | 'xlsx') {
+  const extension = format === 'xlsx' ? 'xlsx' : 'csv'
+  const endpoint = format === 'xlsx' ? '/management/enrollments/export.xlsx' : '/management/enrollments/export'
+  await apiDownload(`${endpoint}?sessionId=${encodeURIComponent(sessionId)}`, `pre-inscriptions-${sessionId}.${extension}`)
 }
 
 const MEDIA_TYPES = ['image/jpeg', 'image/png']

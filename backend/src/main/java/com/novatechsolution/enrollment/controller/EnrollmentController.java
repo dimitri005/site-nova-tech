@@ -14,6 +14,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +61,50 @@ public class EnrollmentController {
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=pre-inscriptions-" + sessionId + ".csv")
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8)).body(content);
+    }
+
+    @Operation(tags = "Management · Pré-inscriptions", summary = "Exporter les pré-inscriptions au format Excel", description = "Génère un classeur XLSX des pré-inscriptions d’une session. Rôles requis : SUPER_ADMIN ou EDITOR.")
+    @GetMapping(value = "/api/v1/management/enrollments/export.xlsx",
+            produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','EDITOR')")
+    public ResponseEntity<byte[]> exportExcel(@RequestParam UUID sessionId) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Pré-inscriptions");
+            String[] headers = {"Identifiant", "Nom", "E-mail", "Téléphone", "Langue", "Statut", "Date de création"};
+            Row header = sheet.createRow(0);
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            for (int column = 0; column < headers.length; column++) {
+                Cell cell = header.createCell(column);
+                cell.setCellValue(headers[column]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIndex = 1;
+            for (var item : service.forSession(sessionId)) {
+                Row row = sheet.createRow(rowIndex++);
+                row.createCell(0).setCellValue(item.getId().toString());
+                row.createCell(1).setCellValue(item.getFullName());
+                row.createCell(2).setCellValue(item.getEmail());
+                row.createCell(3).setCellValue(item.getPhone());
+                row.createCell(4).setCellValue(item.getPreferredLanguage().toUpperCase());
+                row.createCell(5).setCellValue(item.getStatus().name());
+                row.createCell(6).setCellValue(item.getCreatedAt().toString());
+            }
+            sheet.createAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, Math.max(0, rowIndex - 1), 0, headers.length - 1));
+            sheet.createFreezePane(0, 1);
+            for (int column = 0; column < headers.length; column++) sheet.autoSizeColumn(column);
+
+            workbook.write(output);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=pre-inscriptions-" + sessionId + ".xlsx")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(output.toByteArray());
+        } catch (IOException exception) {
+            throw new IllegalStateException("Impossible de générer le fichier Excel.", exception);
+        }
     }
 
     private String escape(String value) {
