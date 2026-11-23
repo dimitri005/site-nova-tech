@@ -12,4 +12,4 @@ export function getSiteSettings(): SiteSettings {
   } catch {
     return {}
   }
-}de
+}
