@@ -93,7 +93,7 @@ public class EnrollmentController {
                 row.createCell(5).setCellValue(item.getStatus().name());
                 row.createCell(6).setCellValue(item.getCreatedAt().toString());
             }
-            sheet.createAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, Math.max(0, rowIndex - 1), 0, headers.length - 1));
+            sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, Math.max(0, rowIndex - 1), 0, headers.length - 1));
             sheet.createFreezePane(0, 1);
             for (int column = 0; column < headers.length; column++) sheet.autoSizeColumn(column);
 

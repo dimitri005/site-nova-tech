@@ -74,7 +74,7 @@ public byte[] creerClasseur() throws IOException {
         data.createCell(1).setCellValue("amina@example.com");
 
         sheet.createFreezePane(0, 1); // garder l'en-tête visible au défilement
-        sheet.createAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, 1, 0, 1));
+        sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, 1, 0, 1));
         sheet.autoSizeColumn(0);
         sheet.autoSizeColumn(1);
 

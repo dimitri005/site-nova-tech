@@ -64,6 +64,7 @@
   background-size: cover;
 }
 #top .hero h1 { max-width: 800px; text-wrap: balance; }
+#top .hero .hero-arrow { position: absolute; top: -80px; right: -58px; left: auto; width: 132px; height: 100px; color: #3372b7; transform: none; }
 #top .hero .button { border-radius: 2px; }
 #top .hero-shape-left { width: 20%; background: linear-gradient(126deg, transparent 0 29%, rgba(51, 114, 183, .7) 29% 66%, transparent 66%); }
 #top .hero-shape-right { background: #2869e2; }
@@ -84,6 +85,7 @@
   #top .navbar .nav-actions { display: flex; margin-left: 0; gap: 0; }
   #top .home-quote { display: none; }
   #top .home-login { min-height: 38px; padding: 0 11px; font-size: 9px; }
+  #top .hero .hero-arrow { top: -56px; right: 0; width: 82px; height: 62px; }
   #top .hero { min-height: 560px; height: calc(100svh - 35px); }
 }
 

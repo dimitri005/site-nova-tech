@@ -790,8 +790,7 @@ const SITE_SECTIONS: { title: string; description: string; fields: SiteField[] }
     { key: 'topbar.visible', label: 'Afficher la barre supérieure', type: 'switch', defaultOn: true },
     { key: 'topbar.text.fr', label: 'Texte (FR)', max: 200 }, { key: 'topbar.text.en', label: 'Text (EN)', max: 200 },
   ] },
-  { title: 'En-tête', description: 'Lien de connexion de l’en-tête.', fields: [
-    { key: 'header.show-login', label: 'Afficher le lien de connexion dans l’en-tête', type: 'switch', defaultOn: false, help: 'Masqué par défaut : les visiteurs n’ont pas besoin de voir l’accès administrateur.' },
+  { title: 'En-tête', description: 'Acces de connexion de l’en-tête.', fields: [
     { key: 'header.login-label.fr', label: 'Libellé (FR)', max: 60 }, { key: 'header.login-label.en', label: 'Label (EN)', max: 60 },
   ] },
   { title: 'Pied de page', description: 'Textes, titres de colonnes et mentions du pied de page (accueil et pages intérieures).', fields: [
