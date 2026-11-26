@@ -11,7 +11,7 @@ npm run build     # build de production
 npm run lint
 ```
 
-L'adresse de l'API se règle avec `VITE_API_BASE_URL` (par défaut `http://localhost:8081/api/v1`).
+L'adresse de l'API se règle avec `VITE_API_BASE_URL` (par défaut `http://localhost:8080/api/v1`, le port Spring Boot local). Docker Compose configure son port exposé `8081` séparément.
 
 ## Structure
 

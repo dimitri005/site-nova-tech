@@ -45,8 +45,26 @@ export function mapFieldErrors(fields: Record<string, string>, fieldNames: strin
 const ACCESS_TOKEN_KEY = 'nova-api-access'
 const REFRESH_TOKEN_KEY = 'nova-api-refresh'
 const SESSION_KEY = 'nova-api-user'
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/v1').replace(/\/$/, '')
+const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '')
 let refreshInFlight: Promise<AdminSession | null> | null = null
+const getCache = new Map<string, { data: unknown; expiresAt: number }>()
+const getInFlight = new Map<string, Promise<unknown>>()
+let getCacheVersion = 0
+const GET_CACHE_LIMIT = 100
+
+function getCacheTtl(path: string) {
+  return path.startsWith('/management/') ? 3_000 : 45_000
+}
+
+export function getCachedApiData<T>(path: string): T | null {
+  return (getCache.get(path)?.data as T | undefined) ?? null
+}
+
+export function invalidateApiGetCache() {
+  getCacheVersion += 1
+  getCache.clear()
+  getInFlight.clear()
+}
 
 function readJson<T>(value: string | null, fallback: T): T {
   if (!value) return fallback
@@ -62,6 +80,7 @@ export function isAuthenticated(): boolean {
 }
 
 function saveSession(session: AdminSession) {
+  invalidateApiGetCache()
   sessionStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken)
   sessionStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken)
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
@@ -69,6 +88,7 @@ function saveSession(session: AdminSession) {
 }
 
 export function clearSession() {
+  invalidateApiGetCache()
   sessionStorage.removeItem(ACCESS_TOKEN_KEY)
   sessionStorage.removeItem(REFRESH_TOKEN_KEY)
   sessionStorage.removeItem(SESSION_KEY)
@@ -112,11 +132,36 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
 }
 
 export function apiGet<T>(path: string, signal?: AbortSignal) {
-  return apiRequest<T>(path, { method: 'GET', signal })
+  const cached = getCache.get(path)
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.data as T)
+  const existing = getInFlight.get(path)
+  if (existing) return existing as Promise<T>
+
+  const cacheVersion = getCacheVersion
+  const request = apiRequest<T>(path, { method: 'GET', signal: signal ?? AbortSignal.timeout(10_000) })
+    .then((data) => {
+      if (cacheVersion === getCacheVersion) {
+        getCache.set(path, { data, expiresAt: Date.now() + getCacheTtl(path) })
+        if (getCache.size > GET_CACHE_LIMIT) {
+          const oldestPath = getCache.keys().next().value
+          if (oldestPath) getCache.delete(oldestPath)
+        }
+      }
+      return data
+    })
+    .finally(() => {
+      if (getInFlight.get(path) === request) getInFlight.delete(path)
+    })
+  getInFlight.set(path, request)
+  return request
 }
 
 export function apiSend<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown) {
   return apiRequest<T>(path, { method, ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }) })
+    .then((result) => {
+      invalidateApiGetCache()
+      return result
+    })
 }
 
 export async function apiDownload(path: string, filename: string) {

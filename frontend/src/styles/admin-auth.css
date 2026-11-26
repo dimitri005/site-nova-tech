@@ -189,27 +189,54 @@
 }
 
 @media (max-width: 700px) {
-  .admin-login-page { display: block; padding: 14px; }
-  .admin-login-shell { display: flex; min-height: 0; flex-direction: column; border-radius: 16px; }
-  .admin-login-welcome { min-height: 0; padding: 27px 26px 24px; }
-  .admin-login-logo-light { width: min(260px, 84%); }
-  .admin-login-welcome-copy { margin-top: 30px; }
-  .admin-login-welcome-copy h2 { max-width: 470px; font-size: clamp(30px, 8vw, 42px); }
-  .admin-login-welcome-copy > p:last-child { font-size: 13px; }
-  .admin-login-tagline { margin-top: 20px; }
-  .admin-login-panel { padding: 34px 25px 26px; }
-  .admin-login-logo { width: min(230px, 80%); margin-bottom: 20px; }
-  .admin-login-emblem { width: 58px; height: 58px; margin-bottom: 14px; }
-  .admin-login-title { margin-bottom: 22px; }
-  .admin-login-title h1 { font-size: 30px; }
+  .admin-login-page { display: grid; min-height: 100svh; min-height: 100dvh; padding: 10px; }
+  .admin-login-shell { display: block; width: min(460px, 100%); min-height: 0; border-radius: 14px; }
+  .admin-login-welcome { display: none; }
+  .admin-login-panel { padding: clamp(14px, 3vh, 22px) clamp(18px, 5vw, 28px); }
+  .admin-login-logo { width: min(205px, 78%); margin-bottom: clamp(9px, 1.8vh, 14px); }
+  .admin-login-emblem { width: 50px; height: 50px; margin-bottom: 9px; border-width: 5px; }
+  .admin-login-emblem svg { width: 24px; height: 24px; }
+  .admin-login-title { margin-bottom: 13px; }
+  .admin-login-title .admin-login-kicker { margin-bottom: 4px; }
+  .admin-login-title h1 { font-size: 28px; }
+  .admin-login-title > p:last-child { font-size: 12px; line-height: 1.4; }
+  .admin-auth-form { gap: 7px; }
+  .admin-auth-input { min-height: 46px; }
+  .admin-auth-input input { height: 44px; }
+  .admin-auth-password-label { margin-top: 2px; }
+  .admin-auth-password-label button, .admin-auth-reveal { min-height: 36px; }
+  .admin-auth-submit { min-height: 46px; margin-top: 4px; }
+  .admin-auth-account-note { display: none; }
+  .admin-login-footer { margin-top: 10px; }
+  .admin-login-back-site { min-height: 34px; margin-top: 2px; padding-top: 7px; }
 }
 
 @media (max-width: 380px) {
-  .admin-login-page { padding: 8px; }
-  .admin-login-welcome { padding: 23px 20px; }
-  .admin-login-panel { padding: 28px 19px 22px; }
-  .admin-auth-input { min-height: 52px; padding: 0 12px; }
-  .admin-auth-input input { height: 48px; font-size: 13px; }
+  .admin-login-page { padding: 6px; }
+  .admin-login-panel { padding: 12px 16px 8px; }
+  .admin-login-logo { width: min(185px, 76%); margin-bottom: 8px; }
+  .admin-login-emblem { width: 46px; height: 46px; margin-bottom: 7px; }
+  .admin-login-title { margin-bottom: 10px; }
+  .admin-auth-input { min-height: 44px; padding: 0 12px; }
+  .admin-auth-input input { height: 42px; font-size: 13px; }
+  .admin-auth-submit { min-height: 44px; }
+}
+
+@media (max-width: 700px) and (max-height: 640px) {
+  .admin-login-page { padding-block: 4px; }
+  .admin-login-panel { padding-block: 8px; }
+  .admin-login-logo { width: min(165px, 72%); margin-bottom: 5px; }
+  .admin-login-emblem { width: 40px; height: 40px; margin-bottom: 5px; }
+  .admin-login-emblem svg { width: 20px; height: 20px; }
+  .admin-login-title { margin-bottom: 8px; }
+  .admin-login-title h1 { font-size: 25px; }
+  .admin-login-title > p:last-child { font-size: 11px; }
+  .admin-auth-form { gap: 5px; }
+  .admin-auth-input { min-height: 40px; }
+  .admin-auth-input input { height: 38px; }
+  .admin-auth-submit { min-height: 40px; }
+  .admin-login-footer { display: none; }
+  .admin-login-back-site { min-height: 30px; padding-top: 5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

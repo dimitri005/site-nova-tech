@@ -1,21 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ApiError, apiGet } from './client'
+import { ApiError, apiGet, getCachedApiData } from './client'
 
 type ApiDataState<T> = {
   requestKey: string | null
   data: T | null
   error: string
   loading: boolean
-}
-
-/** Requêtes GET identiques simultanées : une seule requête réseau partagée (ex. réglages publics demandés par plusieurs composants). */
-const inflight = new Map<string, Promise<unknown>>()
-function sharedGet<T>(path: string): Promise<T> {
-  const existing = inflight.get(path)
-  if (existing) return existing as Promise<T>
-  const request = apiGet<T>(path).finally(() => inflight.delete(path))
-  inflight.set(path, request)
-  return request
 }
 
 export function useApiData<T>(path: string | null) {
@@ -32,7 +22,7 @@ export function useApiData<T>(path: string | null) {
     if (path === null || requestKey === null) return
 
     const controller = new AbortController()
-    sharedGet<T>(path)
+    apiGet<T>(path)
       .then((result) => {
         if (!controller.signal.aborted) {
           setState({ requestKey, data: result, error: '', loading: false })
@@ -40,10 +30,11 @@ export function useApiData<T>(path: string | null) {
       })
       .catch((reason: unknown) => {
         if (!controller.signal.aborted) {
+          const cachedData = getCachedApiData<T>(path)
           setState({
             requestKey,
-            data: null,
-            error: reason instanceof ApiError ? reason.message : 'Impossible de joindre le serveur.',
+            data: cachedData,
+            error: cachedData ? '' : reason instanceof ApiError ? reason.message : 'Impossible de joindre le serveur.',
             loading: false,
           })
         }
@@ -54,10 +45,11 @@ export function useApiData<T>(path: string | null) {
 
   const reload = useCallback(() => setRevision((value) => value + 1), [])
   const stateMatchesRequest = state.requestKey === requestKey
+  const cachedData = path === null ? null : getCachedApiData<T>(path)
 
   return {
-    data: stateMatchesRequest ? state.data : null,
-    loading: path !== null && (!stateMatchesRequest || state.loading),
+    data: stateMatchesRequest ? state.data : cachedData,
+    loading: path !== null && (!stateMatchesRequest || state.loading) && cachedData === null,
     error: stateMatchesRequest ? state.error : '',
     reload,
   }

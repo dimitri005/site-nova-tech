@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { motion, useReducedMotion } from 'motion/react'
 import { useLandingAnimations } from '../animations/useLandingAnimations'
 import { homepageDefaults } from '../data/homepageContent'
+import { projects as localProjects } from '../data/siteContent'
 import { ApiError, apiMediaUrl, apiSend, mapFieldErrors } from '../api/client'
 import type { ArticleRecord, ProjectRecord, ServiceRecord, TeamRecord, TestimonialRecord, TrainingRecord } from '../api/types'
 import { useApiData } from '../api/hooks'
@@ -42,6 +43,23 @@ function LandingPage() {
   const [sendingContact, setSendingContact] = useState(false)
   const homeText = (key: string) => settings?.[`home.${key}.${lang}`]?.trim() || homepageDefaults[`home.${key}.${lang}`] || ''
   const homeImage = (key: string, fallback = '') => { const value = settings?.[`home.${key}`] || homepageDefaults[`home.${key}`] || fallback; return value.startsWith('/media/') ? apiMediaUrl(value) : value }
+  const visibleProjects: ProjectRecord[] = projectRecords?.length
+    ? projectRecords
+    : localProjects.map((project) => ({
+      id: `local-${project.slug}`,
+      slug: project.slug,
+      titleFr: project.slug === 'portail-entreprise' ? 'Portail d’entreprise' : project.slug === 'campagne-numerique' ? 'Campagne numérique' : project.slug === 'outil-de-gestion' ? 'Outil de gestion' : 'Atelier créatif',
+      titleEn: project.title.en,
+      descriptionFr: project.description.fr,
+      descriptionEn: project.description.en,
+      category: project.category,
+      clientName: project.client,
+      technologies: project.technologies,
+      galleryUrls: [],
+      coverImageUrl: project.image,
+      featured: project.featured,
+      published: true,
+    }))
   const clearContactFieldError = (name: string) => setContactFieldErrors((current) => {
     if (!current[name]) return current
     const next = { ...current }
@@ -144,7 +162,7 @@ function LandingPage() {
       ][i]}</svg></span><strong>0{i + 1}</strong><h3>{lang === 'fr' ? service.titleFr : service.titleEn}</h3></motion.article>)}</div></section>
 
 
-      <section className="projects-section" id="projects"><div className="container"><div className="section-heading"><div><p className="eyebrow">{homeText('projects.eyebrow')}</p><h2>{homeText('projects.title')}</h2></div><p className="muted">{homeText('projects.intro')}</p></div><div className="project-grid">{!projectRecords && <HomeSkeletons count={4} height={280}/>}{(projectRecords || []).slice(0, 4).map((project, i) => <Link to={`/${lang}/${(lang === 'fr' ? 'realisations' : 'projects')}/${project.slug}`} className="project-card" key={project.id}><img src={apiMediaUrl(project.coverImageUrl)} alt={lang === 'fr' ? project.titleFr : project.titleEn}/><span className="image-hover-wash" aria-hidden="true"/><span className="project-overlay"><small>{project.category}</small><strong>{lang === 'fr' ? project.titleFr : project.titleEn}</strong><b>{String.fromCharCode(8599)}</b></span><span className="project-number">0{i + 1}</span></Link>)}</div></div></section>
+      <section className="projects-section" id="projects"><div className="container"><div className="section-heading"><div><p className="eyebrow">{homeText('projects.eyebrow')}</p><h2>{homeText('projects.title')}</h2></div><p className="muted">{homeText('projects.intro')}</p></div><div className="project-grid">{visibleProjects.slice(0, 4).map((project, i) => <Link to={`/${lang}/${(lang === 'fr' ? 'realisations' : 'projects')}/${project.slug}`} className="project-card" key={project.id}><img src={apiMediaUrl(project.coverImageUrl)} alt={lang === 'fr' ? project.titleFr : project.titleEn}/><span className="image-hover-wash" aria-hidden="true"/><span className="project-overlay"><small>{project.category}</small><strong>{lang === 'fr' ? project.titleFr : project.titleEn}</strong><b>{String.fromCharCode(8599)}</b></span><span className="project-number">0{i + 1}</span></Link>)}</div></div></section>
 
       <section className="home-training-preview"><div className="container"><div className="home-training-heading"><div><p className="eyebrow">{homeText('training.eyebrow')}</p><h2>{homeText('training.title')}</h2><p>{homeText('training.intro')}</p></div><Link className="button" to={`/${lang}/${(lang === 'fr' ? 'formations' : 'training')}`}>{t('common.viewAll')} <span>&rsaquo;</span></Link></div><div className="home-training-grid">{!trainingRecords && <HomeSkeletons count={3} height={200}/>}{(trainingRecords || []).slice(0, 3).map((course, index) => <Link className="home-training-card" to={`/${lang}/${(lang === 'fr' ? 'formations' : 'training')}/${course.slug}`} key={course.id}><span>0{index + 1}</span><h3>{lang === 'fr' ? course.titleFr : course.titleEn}</h3><p>{course.durationHours ? `${course.durationHours} ${tr(lang, 'ui.landing.heures', 'heures', 'hours')}` : (tr(lang, 'ui.landing.duree-a-confirmer', 'Duree a confirmer', 'Duration to be confirmed'))}</p><b>{t('common.learn')} ?</b></Link>)}</div><p className="home-session-note">{homeText('training.note')}</p></div></section>
 
